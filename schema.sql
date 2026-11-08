@@ -25,7 +25,19 @@ create table if not exists cf_accounts (
   unique (owner, name)
 );
 
--- หมวด: in = เงินสดเข้า · debt = ชำระหนี้ · exp = ค่าใช้จ่าย
+-- ผู้ติดต่อ หนี้/เงินยืม (เจ้าหนี้ เช่น Thani / Kbank · หรือคนที่เราให้ยืม)
+--   opening_debt = ยอดคงค้างยกมา ณ วันเริ่มใช้: + = เราเป็นหนี้เขา · − = เขาเป็นหนี้เรา
+create table if not exists cf_parties (
+  id            bigint generated always as identity primary key,
+  owner         uuid not null default auth.uid() references auth.users on delete cascade,
+  name          text not null,
+  opening_debt  numeric(16,2) not null default 0,
+  sort          int not null default 0,
+  active        boolean not null default true,
+  unique (owner, name)
+);
+
+-- หมวด: in = เงินสดเข้า · exp = ค่าใช้จ่าย (debt สงวนไว้ ไม่ใช้แล้ว — หนี้ใช้ cf_parties)
 create table if not exists cf_categories (
   id      bigint generated always as identity primary key,
   owner   uuid not null default auth.uid() references auth.users on delete cascade,
@@ -40,29 +52,35 @@ create table if not exists cf_categories (
 --   kind = flow     : เงินเข้า/ออกตามหมวด · amount บวก · เครื่องหมายมาจากหมวด (in = +, debt/exp = −)
 --   kind = transfer : โอนจาก account_id ไป to_account_id · amount บวก · ไม่นับเป็นรายรับ/รายจ่าย
 --   kind = adjust   : ปรับยอดให้ตรง statement · amount มีเครื่องหมาย (+ เพิ่ม / − ลด)
+--   kind = loan     : หนี้/เงินยืม กับ party_id · amount บวก · loan_type:
+--                     borrow = กู้ยืม (เงินเข้า) · repay = ชำระหนี้ (เงินออก) · lend = ให้ยืม (เงินออก) · collect = รับชำระคืน (เงินเข้า)
 --   planned = ประมาณการ (ยังไม่จ่าย/ยังไม่ได้รับจริง)
 create table if not exists cf_txns (
   id             bigint generated always as identity primary key,
   owner          uuid not null default auth.uid() references auth.users on delete cascade,
-  kind           text not null default 'flow' check (kind in ('flow','transfer','adjust')),
+  kind           text not null default 'flow' check (kind in ('flow','transfer','adjust','loan')),
   d              date not null,
   account_id     bigint not null references cf_accounts(id) on delete restrict,
   to_account_id  bigint references cf_accounts(id) on delete restrict,
   category_id    bigint references cf_categories(id) on delete restrict,
+  party_id       bigint references cf_parties(id) on delete restrict,
+  loan_type      text check (loan_type in ('borrow','repay','lend','collect')),
   amount         numeric(16,2) not null,
   note           text not null default '',
   planned        boolean not null default false,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now(),
-  check ((kind = 'flow' and category_id is not null and to_account_id is null)
-      or (kind = 'transfer' and to_account_id is not null and to_account_id <> account_id and category_id is null)
-      or (kind = 'adjust' and category_id is null and to_account_id is null))
+  check ((kind = 'flow' and category_id is not null and to_account_id is null and party_id is null)
+      or (kind = 'transfer' and to_account_id is not null and to_account_id <> account_id and category_id is null and party_id is null)
+      or (kind = 'adjust' and category_id is null and to_account_id is null and party_id is null)
+      or (kind = 'loan' and party_id is not null and loan_type is not null and category_id is null and to_account_id is null))
 );
 create index if not exists idx_cf_txns_owner_d on cf_txns(owner, d);
 
 -- ===== RLS: เจ้าของเท่านั้น ==================================================
 alter table cf_settings   enable row level security;
 alter table cf_accounts   enable row level security;
+alter table cf_parties    enable row level security;
 alter table cf_categories enable row level security;
 alter table cf_txns       enable row level security;
 
@@ -70,12 +88,14 @@ drop policy if exists own_all on cf_settings;
 create policy own_all on cf_settings   for all to authenticated using (owner = auth.uid()) with check (owner = auth.uid());
 drop policy if exists own_all on cf_accounts;
 create policy own_all on cf_accounts   for all to authenticated using (owner = auth.uid()) with check (owner = auth.uid());
+drop policy if exists own_all on cf_parties;
+create policy own_all on cf_parties    for all to authenticated using (owner = auth.uid()) with check (owner = auth.uid());
 drop policy if exists own_all on cf_categories;
 create policy own_all on cf_categories for all to authenticated using (owner = auth.uid()) with check (owner = auth.uid());
 drop policy if exists own_all on cf_txns;
 create policy own_all on cf_txns       for all to authenticated using (owner = auth.uid()) with check (owner = auth.uid());
 
 -- anon (ยังไม่ login) แตะอะไรไม่ได้เลย
-revoke all on cf_settings, cf_accounts, cf_categories, cf_txns from anon;
+revoke all on cf_settings, cf_accounts, cf_parties, cf_categories, cf_txns from anon;
 
 -- ตรวจ: select tablename, rowsecurity from pg_tables where tablename like 'cf_%';
