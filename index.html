@@ -166,7 +166,7 @@ label.f{display:block;font-size:12.5px;color:var(--mute);font-weight:600;margin:
 // anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันจริงคือ RLS (owner = auth.uid()) + ต้อง login
 const CF_SUPABASE_URL = 'https://xgpsdcnqravhouwaktgp.supabase.co';
 const CF_SUPABASE_ANON = 'sb_publishable_HGOrB_SgTUq22r67me1B5Q_KYhNoL7B';   // publishable key (Fillbook)
-const CF_VERSION = '2026-11-08s';
+const CF_VERSION = '2026-11-08t';
 // =============================================================================
 
 const GRP={in:{label:'เงินเข้า',sign:1,color:'#1d9a87',icon:'⬇'},debt:{label:'ชำระหนี้',sign:-1,color:'#b54708',icon:'🏦'},exp:{label:'ค่าใช้จ่าย',sign:-1,color:'#e0304d',icon:'⬆'}};
@@ -542,7 +542,7 @@ function openTx(id,preset,ruleId){const t=id?S.txns.find(x=>x.id===id):null;cons
     $('#fD').onchange=()=>setD(fixYear($('#fD').value));$('#fPrev').onclick=()=>setD(addDays($('#fD').value,-1));$('#fNext').onclick=()=>setD(addDays($('#fD').value,1));
     $('#fSave').onclick=()=>save(false);if($('#fSaveMore'))$('#fSaveMore').onclick=()=>save(true);
     if(R)$('#fDel').onclick=async()=>{if(!confirm('ลบรายการประจำนี้?\nรายการประมาณการล่วงหน้าที่ยังไม่ยืนยันจะถูกลบด้วย · รายการที่ยืนยันแล้วยังอยู่'))return;
-      try{await DB.removeRecurringFuture(R.id,'0000-01-01');await DB.remove('cf_recurring',R.id);}catch(e){alert(e.message||e);return;}
+      try{await DB.removeRecurringFuture(R.id,'1900-01-01');await DB.remove('cf_recurring',R.id);}catch(e){alert(e.message||e);return;}
       S.txns=S.txns.filter(x=>!(x.recurring_id===R.id&&x.planned));S.txns.forEach(x=>{if(x.recurring_id===R.id)x.recurring_id=null;});S.recur=S.recur.filter(x=>x.id!==R.id);closeModal();toast('ลบแล้ว');render();};
     else if(t)$('#fDel').onclick=async()=>{if(!confirm('ลบรายการนี้?'+((t.attachments||[]).length?'\n(สลิปที่แนบจะถูกลบด้วย)':'')))return;try{await DB.remove('cf_txns',t.id);if((t.attachments||[]).length)await DB.removeFiles(t.attachments).catch(()=>{});}catch(e){alert(e.message||e);return;}S.txns=S.txns.filter(x=>x.id!==t.id);closeModal();toast('ลบแล้ว');render();};
     if(!t)setTimeout(()=>amt.focus(),60);};
