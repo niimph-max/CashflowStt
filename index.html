@@ -167,7 +167,7 @@ label.f{display:block;font-size:12.5px;color:var(--mute);font-weight:600;margin:
 // anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันจริงคือ RLS (owner = auth.uid()) + ต้อง login
 const CF_SUPABASE_URL = 'https://xgpsdcnqravhouwaktgp.supabase.co';
 const CF_SUPABASE_ANON = 'sb_publishable_HGOrB_SgTUq22r67me1B5Q_KYhNoL7B';   // publishable key (Fillbook)
-const CF_VERSION = '2026-11-08k';
+const CF_VERSION = '2026-11-08l';
 // =============================================================================
 
 const GRP={in:{label:'เงินเข้า',sign:1,color:'#067647',icon:'⬇'},debt:{label:'ชำระหนี้',sign:-1,color:'#b54708',icon:'🏦'},exp:{label:'ค่าใช้จ่าย',sign:-1,color:'#c0262d',icon:'⬆'}};
@@ -361,7 +361,10 @@ function renderList(){const [y,mo]=S.ym.split('-').map(Number);let tx=scopeTxns(
   if(!days.length)h+='<div class="card empty">ไม่มีรายการใน '+TH_MF[mo]+' '+(y+543)+'</div>';
   days.forEach(d=>{const net=byD[d].reduce((s,t)=>s+scopeEffect(t),0);const dt=new Date(d+'T00:00:00');
     h+='<div class="card"><div class="dayh"><div class="dn">'+dt.getDate()+'</div><div class="dw">'+TH_DW[dt.getDay()]+'<br>'+TH_MF[dt.getMonth()+1]+' '+(dt.getFullYear()+543)+'</div><div class="dt '+(net<0?'neg':'')+'">'+(net>=0?'+':'−')+fmt(Math.abs(net))+'</div></div>'
-      +byD[d].sort((a,b)=>b.id-a.id).map(t=>txRow(t,true,false)).join('')+'</div>';});
+      +byD[d].sort((a,b)=>b.id-a.id).map(t=>txRow(t,true,false)).join('')
+      +(()=>{const eb=scopeBalance(d);   // ยอดสิ้นวันของบัญชีที่เลือกด้านบน (นับประมาณการด้วย เหมือนตาราง)
+        return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-top:1px dashed var(--line);margin-top:4px;padding-top:8px"><span class="muted" style="white-space:nowrap">คงเหลือสิ้นวัน</span><b class="'+(eb<0?'neg':'')+'" style="white-space:nowrap">฿ '+fmt(eb)+'</b></div>';})()
+      +'</div>';});
   $('#main').innerHTML=h;}
 
 // ===================== หน้า: ตาราง (เหมือน Excel เดิม) =====================
