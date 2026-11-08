@@ -162,7 +162,7 @@ label.f{display:block;font-size:12.5px;color:var(--mute);font-weight:600;margin:
 // anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันจริงคือ RLS (owner = auth.uid()) + ต้อง login
 const CF_SUPABASE_URL = 'https://xgpsdcnqravhouwaktgp.supabase.co';
 const CF_SUPABASE_ANON = 'sb_publishable_HGOrB_SgTUq22r67me1B5Q_KYhNoL7B';   // publishable key (Fillbook)
-const CF_VERSION = '2026-11-08g';
+const CF_VERSION = '2026-11-08h';
 // =============================================================================
 
 const GRP={in:{label:'เงินเข้า',sign:1,color:'#067647',icon:'⬇'},debt:{label:'ชำระหนี้',sign:-1,color:'#b54708',icon:'🏦'},exp:{label:'ค่าใช้จ่าย',sign:-1,color:'#c0262d',icon:'⬆'}};
@@ -278,7 +278,7 @@ function dailyBalances(from,to){const out={};for(let d=from;d<=to;d=addDays(d,1)
 const $=s=>document.querySelector(s);
 function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
 function closeModal(){$('#modal').innerHTML='';}
-function wIcon(a,sm){if(!a)return '<div class="ic'+(sm?' sm':'')+'" style="background:#0f3d2e">∑</div>';const c=WCOLORS[a.id%WCOLORS.length];return '<div class="ic'+(sm?' sm':'')+'" style="background:'+c+'">'+esc((a.name||'?').trim().charAt(0).toUpperCase())+'</div>';}
+function wIcon(a,sm){if(!a)return '<div class="ic'+(sm?' sm':'')+'" style="background:#0f3d2e">∑</div>';const c=WCOLORS[a.id%WCOLORS.length];return '<div class="ic'+(sm?' sm':'')+'" style="background:'+c+'">'+esc((a.name||'?').trim().replace(/^[เแโใไ]/,'').charAt(0).toUpperCase())+'</div>';}   // ข้ามสระหน้า (เงินสด → ง)
 function txIcon(t){if(t.kind==='transfer')return '<div class="ic" style="background:var(--xfer)">⇄</div>';if(t.kind==='adjust')return '<div class="ic" style="background:#475467">⚖</div>';if(t.kind==='loan')return '<div class="ic" style="background:#b54708">'+(LOAN[t.loan_type].sign>0?'🤝':'💸')+'</div>';const c=catById(t.category_id)||{grp:'exp'};return '<div class="ic" style="background:'+GRP[c.grp].color+'">'+GRP[c.grp].icon+'</div>';}
 function renderHeader(){const h=$('#hdr');
   if(['more','wallets','cats','debts','recur'].includes(S.tab)){const t={more:'เพิ่มเติม',wallets:'กระเป๋าเงินของฉัน',cats:'หมวด',debts:'หนี้ / เงินยืม',recur:'รายการประจำ'}[S.tab];
@@ -309,7 +309,12 @@ function renderHome(){
   const sum=g=>g==='debt'?mAll.filter(t=>t.kind==='loan'&&t.loan_type==='repay').reduce((a,t)=>a+t.amount,0):mTx.filter(t=>(catById(t.category_id)||{}).grp===g).reduce((a,t)=>a+t.amount,0);
   const sTx=scopeTxns();const late=sTx.filter(t=>t.planned&&t.d<today).sort((a,b)=>a.d.localeCompare(b.d));
   const soon=sTx.filter(t=>t.planned&&t.d>=today&&t.d<=addDays(today,14)).sort((a,b)=>a.d.localeCompare(b.d));
-  let h=firstLow?'<div class="alert bad">⚠️ คาดว่าเงินจะต่ำกว่า '+fmt0(warn)+' วันที่ '+thDY(firstLow)+' (ยอด '+fmt0(daily[firstLow])+')</div>'
+  // สถานะเงินสด ณ ตอนนี้ (ยอดจริงแต่ละบัญชี) — ขอไว้บนสุดของหน้าภาพรวม
+  const incA=S.accts.filter(a=>a.active&&a.in_total),excA=S.accts.filter(a=>a.active&&!a.in_total);const totA=incA.reduce((x,a)=>x+acctBalance(a,today,true),0);
+  let h='<div class="card"><div class="row" onclick="pickWallet(\'all\')">'+wIcon(null)+'<div class="m"><div class="c" style="font-size:17px">Total · สถานะเงินสดตอนนี้</div><div class="n" style="font-size:15px;font-weight:700;color:'+(totA<0?'var(--out)':'var(--ink)')+'">฿ '+fmt(totA)+'</div></div>'+(S.wallet==='all'?'<b style="color:#2f6fb0;font-size:20px">✓</b>':'')+'</div>'
+    +incA.map(a=>walletRow(a,true)).join('')+'</div>'
+    +(excA.length?'<div class="sec-t">ไม่รวมใน Total</div><div class="card">'+excA.map(a=>walletRow(a,true)).join('')+'</div>':'');
+  h+=firstLow?'<div class="alert bad">⚠️ คาดว่าเงินจะต่ำกว่า '+fmt0(warn)+' วันที่ '+thDY(firstLow)+' (ยอด '+fmt0(daily[firstLow])+')</div>'
                 :'<div class="alert ok">✓ 60 วันข้างหน้า เงินไม่ต่ำกว่า '+fmt0(warn)+'</div>';
   h+='<div class="kpis"><div class="kpi"><div class="k">คงเหลือจริงวันนี้</div><div class="v'+(balToday<0?' neg':'')+'">'+fmt0(balToday)+'</div><div class="s">'+(late.length?'ยังไม่ยืนยัน '+late.length+' รายการ':thD(today))+'</div></div>'
     +'<div class="kpi"><div class="k">คาดการณ์สิ้น '+TH_M[mo]+'</div><div class="v'+(balMEnd<0?' neg':'')+'">'+fmt0(balMEnd)+'</div><div class="s">รวมประมาณการ</div></div>'
