@@ -166,7 +166,7 @@ label.f{display:block;font-size:12.5px;color:var(--mute);font-weight:600;margin:
 // anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันจริงคือ RLS (owner = auth.uid()) + ต้อง login
 const CF_SUPABASE_URL = 'https://xgpsdcnqravhouwaktgp.supabase.co';
 const CF_SUPABASE_ANON = 'sb_publishable_HGOrB_SgTUq22r67me1B5Q_KYhNoL7B';   // publishable key (Fillbook)
-const CF_VERSION = '2026-11-08v';
+const CF_VERSION = '2026-11-08w';
 // =============================================================================
 
 const GRP={in:{label:'เงินเข้า',sign:1,color:'#1d9a87',icon:'⬇'},debt:{label:'ชำระหนี้',sign:-1,color:'#b54708',icon:'🏦'},exp:{label:'ค่าใช้จ่าย',sign:-1,color:'#e0304d',icon:'⬆'}};
@@ -376,10 +376,10 @@ let listFilter='all';
 function renderList(){const [y,mo]=S.ym.split('-').map(Number);let tx=scopeTxns().filter(t=>t.d.slice(0,7)===S.ym);
   if(listFilter==='plan')tx=tx.filter(t=>t.planned);else if(listFilter==='xfer')tx=tx.filter(t=>t.kind==='transfer'||t.kind==='adjust');else if(listFilter==='debt')tx=tx.filter(t=>t.kind==='loan');else if(GRP[listFilter])tx=tx.filter(t=>t.kind==='flow'&&(catById(t.category_id)||{}).grp===listFilter);
   const mEnd=S.ym+'-'+pad(daysIn(y,mo)),mStart=S.ym+'-01';const bS=scopeBalance(addDays(mStart,-1)),bE=scopeBalance(mEnd);
-  let inn=0,out=0;tx.forEach(t=>{const e=scopeEffect(t);if(e>0)inn+=e;else out-=e;});
+  let inn=0,out=0;const BI={},BO={};const kk=t=>t.kind==='flow'?((catById(t.category_id)||{}).grp==='in'?'รายรับ':'ค่าใช้จ่าย'):t.kind==='loan'?({borrow:'กู้ยืม',repay:'ชำระหนี้',lend:'ให้ยืม',collect:'รับชำระคืน'})[t.loan_type]:t.kind==='transfer'?'โอน':'ปรับยอด';tx.forEach(t=>{const e=scopeEffect(t);if(!e)return;const k=kk(t);if(e>0){inn+=e;BI[k]=(BI[k]||0)+e;}else{out-=e;BO[k]=(BO[k]||0)-e;}});const brk=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<div>'+k+' '+fmt(v)+'</div>').join('');
   let h='<div class="card"><div style="display:flex;justify-content:space-between"><span class="muted">ยอดต้นเดือน</span><b>'+fmt(bS)+'</b></div>'
     +'<div style="display:flex;justify-content:space-between"><span class="muted">ยอดสิ้นเดือน</span><b class="'+(bE<0?'neg':'')+'">'+fmt(bE)+'</b></div>'
-    +'<div style="display:flex;justify-content:space-between;border-top:1px solid var(--line);margin-top:6px;padding-top:6px"><span class="pos">+'+fmt(inn)+'</span><span class="neg">−'+fmt(out)+'</span></div></div>';
+    +'<div style="display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--line);margin-top:6px;padding-top:6px"><div><div class="muted">เงินเข้าทั้งเดือน</div><b class="pos">+'+fmt(inn)+'</b><div class="muted" style="font-size:12px;margin-top:2px">'+brk(BI)+'</div></div>'+'<div style="text-align:right"><div class="muted">เงินออกทั้งเดือน</div><b class="neg">−'+fmt(out)+'</b><div class="muted" style="font-size:12px;margin-top:2px">'+brk(BO)+'</div></div></div>'+'<div class="muted" style="font-size:11.5px;margin-top:6px">รวมรายการประมาณการด้วย · ยอดต้นเดือน + เงินเข้า − เงินออก = ยอดสิ้นเดือน</div></div>';
   h+='<div class="toolbar chips">'+[['all','ทั้งหมด'],['in','เงินเข้า'],['exp','ค่าใช้จ่าย'],['debt','หนี้/ยืม'],['xfer','โอน/ปรับยอด'],['plan','ประมาณการ']].map(([k,l])=>'<button class="chip'+(listFilter===k?' on':'')+'" onclick="listFilter=\''+k+'\';render()">'+l+'</button>').join('')+'</div>';
   const byD={};tx.forEach(t=>(byD[t.d]=byD[t.d]||[]).push(t));const days=Object.keys(byD).sort().reverse();
   if(!days.length)h+='<div class="card empty">ไม่มีรายการใน '+TH_MF[mo]+' '+(y+543)+'</div>';
