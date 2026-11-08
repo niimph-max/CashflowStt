@@ -1,18 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#22c55e"/>
-      <stop offset="1" stop-color="#0f3d2e"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" fill="url(#bg)"/>
-  <!-- เหรียญ -->
-  <circle cx="256" cy="256" r="168" fill="#ffffff" opacity="0.12"/>
-  <!-- กราฟแท่ง -->
-  <rect x="136" y="292" width="58" height="96" rx="14" fill="#ffffff" opacity="0.85"/>
-  <rect x="227" y="236" width="58" height="152" rx="14" fill="#ffffff" opacity="0.92"/>
-  <rect x="318" y="176" width="58" height="212" rx="14" fill="#ffffff"/>
-  <!-- ลูกศรขึ้น -->
-  <polyline points="128,250 210,190 262,214 362,122" fill="none" stroke="#fbbf24" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
-  <polygon points="384,96 392,176 312,128" fill="#fbbf24" stroke="#fbbf24" stroke-width="10" stroke-linejoin="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22c55e"/><stop offset="1" stop-color="#0f3d2e"/></linearGradient><linearGradient id="gd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fde68a"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs><rect width="512" height="512" fill="url(#bg)"/><circle cx="300" cy="168" r="104" fill="url(#gd)" stroke="#b45309" stroke-width="13"/><text x="300" y="168" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="135" fill="#7c2d12" text-anchor="middle" dominant-baseline="central">฿</text><g transform="translate(26,96) scale(0.9)"><rect x="64" y="196" width="262" height="150" rx="16" fill="#ffffff"/><path d="M334 226 h70 q18 0 28 16 l34 52 q8 12 8 26 v26 h-140 z" fill="#ffffff"/><path d="M352 244 h46 q8 0 13 8 l22 36 h-81 z" fill="#0f3d2e" opacity=".85"/><rect x="56" y="346" width="420" height="22" rx="8" fill="#ffffff"/><g fill="#0f3d2e" stroke="#ffffff" stroke-width="14"><circle cx="128" cy="380" r="34"/><circle cx="214" cy="380" r="34"/><circle cx="404" cy="380" r="34"/></g><g fill="#ffffff"><circle cx="128" cy="380" r="10"/><circle cx="214" cy="380" r="10"/><circle cx="404" cy="380" r="10"/></g></g></svg>
