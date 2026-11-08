@@ -166,7 +166,7 @@ label.f{display:block;font-size:12.5px;color:var(--mute);font-weight:600;margin:
 // anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันจริงคือ RLS (owner = auth.uid()) + ต้อง login
 const CF_SUPABASE_URL = 'https://xgpsdcnqravhouwaktgp.supabase.co';
 const CF_SUPABASE_ANON = 'sb_publishable_HGOrB_SgTUq22r67me1B5Q_KYhNoL7B';   // publishable key (Fillbook)
-const CF_VERSION = '2026-11-08t';
+const CF_VERSION = '2026-11-08u';
 // =============================================================================
 
 const GRP={in:{label:'เงินเข้า',sign:1,color:'#1d9a87',icon:'⬇'},debt:{label:'ชำระหนี้',sign:-1,color:'#b54708',icon:'🏦'},exp:{label:'ค่าใช้จ่าย',sign:-1,color:'#e0304d',icon:'⬆'}};
@@ -351,9 +351,9 @@ function renderHome(){
   h+='<div class="kpis"><div class="kpi"><div class="k">เงินเข้า '+TH_M[mo]+'</div><div class="v pos">'+fmt0(sum('in'))+'</div></div>'
     +'<div class="kpi"><div class="k">ชำระหนี้ '+TH_M[mo]+'</div><div class="v" style="color:var(--debt)">'+fmt0(sum('debt'))+'</div></div>'
     +'<div class="kpi"><div class="k">ค่าใช้จ่าย '+TH_M[mo]+'</div><div class="v neg">'+fmt0(sum('exp'))+'</div></div></div>';
-  if(S.budgets.length){const U=budgetUsage(S.ym);let tb=0,tu=0,over=0;S.budgets.forEach(b=>{const u=U[b.category_id]||{act:0,plan:0};tb+=b.amount;tu+=u.act+u.plan;if(u.act+u.plan>b.amount)over++;});
-    h+='<div class="card" style="cursor:pointer" onclick="S.tab=\'budget\';render()"><div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0">🎯 งบประมาณ '+TH_M[mo]+'</h2><span class="'+(tu>tb?'neg':'muted')+'" style="font-weight:700">'+(tb?Math.round(tu/tb*100):0)+'%</span></div>'
-      +'<div class="muted">ใช้ไป '+fmt(tu)+' / '+fmt(tb)+(over?' · <span class="neg">เกินงบ '+over+' หมวด</span>':'')+'</div></div>';}
+  if(S.budgets.length){const U=budgetUsage(S.ym);let tb=0,tu=0,over=0,ib=0,iu=0;S.budgets.forEach(b=>{const c=catById(b.category_id);if(!c)return;const u=U[b.category_id]||{act:0,plan:0};if(c.grp==='in'){ib+=b.amount;iu+=u.act+u.plan;return;}tb+=b.amount;tu+=u.act+u.plan;if(u.act+u.plan>b.amount)over++;});
+    h+='<div class="card" style="cursor:pointer" onclick="S.tab=\'budget\';render()"><div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0">🎯 งบประมาณ '+TH_M[mo]+'</h2><span class="'+(tu>tb?'neg':'muted')+'" style="font-weight:700">'+(tb?Math.round(tu/tb*100)+'%':'')+'</span></div>'
+      +(tb?'<div class="muted">ใช้ไป '+fmt(tu)+' / '+fmt(tb)+(over?' · <span class="neg">เกินงบ '+over+' หมวด</span>':'')+'</div>':'')+(ib?'<div class="muted">รายรับ '+fmt(iu)+' / เป้า '+fmt(ib)+' · <span class="'+(iu>=ib?'pos':'')+'" style="font-weight:700">'+Math.round(iu/ib*100)+'%</span></div>':'')+'</div>';}
   h+='<div class="card"><h2>ยอดเงินคาดการณ์ 60 วัน</h2>'+sparkSvg(daily,warn)+'</div>';
   if(late.length)h+='<div class="card"><h2>⏰ เลยกำหนด ยังไม่ยืนยัน ('+late.length+')</h2>'+late.map(t=>txRow(t,true,true)).join('')+'</div>';
   h+='<div class="card"><h2>📌 ประมาณการ 14 วันข้างหน้า</h2>'+(soon.length?soon.map(t=>txRow(t,true,true)).join(''):'<div class="muted">ไม่มีรายการ</div>')+'</div>';
@@ -687,38 +687,51 @@ function renderRecur(){const today=todayIso();
   $('#main').innerHTML=h;}
 
 // ===================== หน้า: งบประมาณ =====================
-function budgetUsage(ym){const out={};scopeTxns().forEach(t=>{if(t.kind!=='flow'||t.d.slice(0,7)!==ym)return;const c=catById(t.category_id);if(!c||c.grp!=='exp')return;
+function budgetUsage(ym){const out={};scopeTxns().forEach(t=>{if(t.kind!=='flow'||t.d.slice(0,7)!==ym)return;const c=catById(t.category_id);if(!c||(c.grp!=='exp'&&c.grp!=='in'))return;
     const o=out[c.id]=out[c.id]||{act:0,plan:0};if(t.planned)o.plan+=t.amount;else o.act+=t.amount;});return out;}
 function renderBudget(){const [y,mo]=S.ym.split('-').map(Number);const nd=daysIn(y,mo);const today=todayIso();const U=budgetUsage(S.ym);
-  const L=S.budgets.map(b=>({b,c:catById(b.category_id),u:U[b.category_id]||{act:0,plan:0}})).filter(x=>x.c).sort((a,b)=>a.c.sort-b.c.sort);
+  const ALL=S.budgets.map(b=>({b,c:catById(b.category_id),u:U[b.category_id]||{act:0,plan:0}})).filter(x=>x.c).sort((a,b)=>a.c.sort-b.c.sort);
+  const L=ALL.filter(x=>x.c.grp==='exp'),LI=ALL.filter(x=>x.c.grp==='in');
   const tb=L.reduce((s,x)=>s+x.b.amount,0),ta=L.reduce((s,x)=>s+x.u.act,0),tp=L.reduce((s,x)=>s+x.u.plan,0);const left=tb-ta-tp;
   const daysLeft=S.ym===today.slice(0,7)?nd-(+today.slice(8))+1:(S.ym>today.slice(0,7)?nd:0);
-  const bar0=0;
   const bar=(b,a,p)=>{const mx=Math.max(b,a+p,1);const over=a+p>b;return '<div style="height:10px;border-radius:6px;background:#e6f2ef;overflow:hidden;display:flex;margin-top:6px"><div style="width:'+(a/mx*100)+'%;background:'+(over?'#e0304d':'#48b9a8')+'"></div><div style="width:'+(p/mx*100)+'%;background:'+(over?'#f5a3a3':'#c4b5fd')+'"></div></div>';};
+  /* เป้ารายรับ: ยิ่งได้มากยิ่งดี — ถึงเป้า = เขียว ไม่มีสีแดง */
+  const barIn=(b,a,p)=>{const mx=Math.max(b,a+p,1);return '<div style="height:10px;border-radius:6px;background:#e6f2ef;overflow:hidden;display:flex;margin-top:6px"><div style="width:'+(a/mx*100)+'%;background:#1d9a87"></div><div style="width:'+(p/mx*100)+'%;background:#c4b5fd"></div></div>';};
   let h=migrateNote();
-  if(!L.length)h+='<div class="card empty"><div style="font-size:40px">🎯</div><h2>ยังไม่ได้ตั้งงบประมาณ</h2><div>ตั้งงบรายเดือนให้หมวดค่าใช้จ่าย ใช้ซ้ำทุกเดือน</div><div class="savebar" style="margin-top:14px"><button class="btn pri" onclick="openBudget(null)">+ ตั้งงบประมาณ</button></div></div>';
-  else{h+='<div class="card"><div class="muted">งบรวม '+TH_MF[mo]+' '+(y+543)+'</div><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:22px">'+fmt(tb)+'</b><span class="'+(left<0?'neg':'pos')+'" style="font-weight:700">'+(left<0?'เกินงบ ':'เหลือ ')+fmt(Math.abs(left))+'</span></div>'
+  if(!ALL.length)h+='<div class="card empty"><div style="font-size:40px">🎯</div><h2>ยังไม่ได้ตั้งงบประมาณ</h2><div>ตั้งงบรายเดือนให้หมวดค่าใช้จ่าย หรือเป้ารายรับให้หมวดเงินเข้า · ใช้ซ้ำทุกเดือน</div><div class="savebar" style="margin-top:14px"><button class="btn pri" onclick="openBudget(null,\'exp\')">+ งบค่าใช้จ่าย</button><button class="btn" onclick="openBudget(null,\'in\')">+ เป้ารายรับ</button></div></div>';
+  if(L.length){h+='<div class="card"><div class="muted">งบค่าใช้จ่ายรวม '+TH_MF[mo]+' '+(y+543)+'</div><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:22px">'+fmt(tb)+'</b><span class="'+(left<0?'neg':'pos')+'" style="font-weight:700">'+(left<0?'เกินงบ ':'เหลือ ')+fmt(Math.abs(left))+'</span></div>'
       +bar(tb,ta,tp)+'<div class="muted" style="display:flex;justify-content:space-between;margin-top:6px"><span>ใช้จริง '+fmt(ta)+'</span><span style="color:var(--plan)">ประมาณการ '+fmt(tp)+'</span></div>'
       +(daysLeft&&left>0?'<div class="muted" style="margin-top:4px">เหลือ '+daysLeft+' วัน · ใช้ได้อีกวันละ ≈ '+fmt(left/daysLeft)+'</div>':'')+'</div>';
-    h+='<div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">งบตามหมวด<button class="btn sm" onclick="openBudget(null)">+ ตั้งงบ</button></div><div class="card">'
+    h+='<div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">งบค่าใช้จ่ายตามหมวด<button class="btn sm" onclick="openBudget(null,\'exp\')">+ ตั้งงบ</button></div><div class="card">'
       +L.map(x=>{const rem=x.b.amount-x.u.act-x.u.plan;const pct=x.b.amount?Math.round((x.u.act+x.u.plan)/x.b.amount*100):0;
         return '<div class="row" style="display:block" onclick="openBudget('+x.c.id+')"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>'+esc(x.c.name)+'</b><span class="'+(rem<0?'neg':'')+'" style="font-weight:700;white-space:nowrap">'+(rem<0?'เกิน ':'เหลือ ')+fmt(Math.abs(rem))+'</span></div>'
           +bar(x.b.amount,x.u.act,x.u.plan)+'<div class="muted" style="display:flex;justify-content:space-between;margin-top:4px"><span>'+fmt(x.u.act+x.u.plan)+' / '+fmt(x.b.amount)+'</span><span>'+pct+'%</span></div></div>';}).join('')+'</div>';}
+  else if(ALL.length)h+='<div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">งบค่าใช้จ่าย<button class="btn sm" onclick="openBudget(null,\'exp\')">+ ตั้งงบ</button></div>';
+  if(LI.length){const ib=LI.reduce((s,x)=>s+x.b.amount,0),ia=LI.reduce((s,x)=>s+x.u.act,0),ip=LI.reduce((s,x)=>s+x.u.plan,0);const gap=ib-ia-ip;
+    h+='<div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">เป้ารายรับ<button class="btn sm" onclick="openBudget(null,\'in\')">+ ตั้งเป้า</button></div><div class="card">'
+      +'<div class="muted">เป้ารวม '+TH_MF[mo]+' '+(y+543)+'</div><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:22px">'+fmt(ib)+'</b><span class="'+(gap<=0?'pos':'')+'" style="font-weight:700">'+(gap<=0?'ถึงเป้า ✓ เกิน ':'ขาดอีก ')+fmt(Math.abs(gap))+'</span></div>'
+      +barIn(ib,ia,ip)+'<div class="muted" style="display:flex;justify-content:space-between;margin-top:6px"><span>ได้รับจริง '+fmt(ia)+'</span><span style="color:var(--plan)">ประมาณการ '+fmt(ip)+'</span></div></div><div class="card">'
+      +LI.map(x=>{const gp=x.b.amount-x.u.act-x.u.plan;const pct=x.b.amount?Math.round((x.u.act+x.u.plan)/x.b.amount*100):0;
+        return '<div class="row" style="display:block" onclick="openBudget('+x.c.id+')"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>'+esc(x.c.name)+'</b><span class="'+(gp<=0?'pos':'')+'" style="font-weight:700;white-space:nowrap">'+(gp<=0?'ถึงเป้า ✓':'ขาดอีก '+fmt(gp))+'</span></div>'
+          +barIn(x.b.amount,x.u.act,x.u.plan)+'<div class="muted" style="display:flex;justify-content:space-between;margin-top:4px"><span>'+fmt(x.u.act+x.u.plan)+' / '+fmt(x.b.amount)+'</span><span>'+pct+'%</span></div></div>';}).join('')+'</div>';}
+  else if(ALL.length)h+='<div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">เป้ารายรับ<button class="btn sm" onclick="openBudget(null,\'in\')">+ ตั้งเป้า</button></div>';
   const un=S.cats.filter(c=>c.grp==='exp'&&!S.budgets.some(b=>b.category_id===c.id)&&U[c.id]);
   if(un.length)h+='<div class="sec-t">ใช้จ่ายในหมวดที่ยังไม่ตั้งงบ</div><div class="card">'+un.map(c=>'<div class="row" onclick="openBudget('+c.id+')"><div class="m"><div class="c" style="font-weight:600">'+esc(c.name)+'</div><div class="n">แตะเพื่อตั้งงบ</div></div><div class="a neg">'+fmt(U[c.id].act+U[c.id].plan)+'</div></div>').join('')+'</div>';
-  h+='<div class="muted" style="padding:0 4px">สีเขียว = จ่ายจริงแล้ว · สีม่วง = ประมาณการ · งบใช้ซ้ำทุกเดือน · นับตามบัญชีที่เลือกด้านบน</div>';
+  h+='<div class="muted" style="padding:0 4px">สีเขียว = จ่าย/รับจริงแล้ว · สีม่วง = ประมาณการ · งบและเป้าใช้ซ้ำทุกเดือน · นับตามบัญชีที่เลือกด้านบน</div>';
   $('#main').innerHTML=h;}
-function openBudget(catId){const b=catId?S.budgets.find(x=>x.category_id===catId):null;const cats=S.cats.filter(c=>c.grp==='exp'&&(c.active||c.id===catId)&&(c.id===catId||!S.budgets.some(x=>x.category_id===c.id)));
-  if(!cats.length){toast('ทุกหมวดตั้งงบแล้ว');return;}
-  $('#modal').innerHTML='<div class="mask" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="top"><button class="hbtn" onclick="closeModal()">✕</button><h3>'+(b?'แก้ไขงบ':'ตั้งงบประมาณ')+'</h3>'+(b?'<button class="hbtn" id="bDel" style="color:var(--out)">🗑</button>':'<span style="width:38px"></span>')+'</div>'
-   +'<div class="fgroup"><div class="frow"><div class="fi">⬆</div><div class="fx"><div class="lab">หมวดค่าใช้จ่าย</div><select id="bCat"'+(b?' disabled':'')+'>'+cats.map(c=>'<option value="'+c.id+'"'+(c.id===catId?' selected':'')+'>'+esc(c.name)+'</option>').join('')+'</select></div></div>'
-   +'<div class="frow"><span class="cur">THB</span><div class="fx"><div class="lab">งบต่อเดือน (ใช้ซ้ำทุกเดือน)</div><input id="bAmt" class="amt" inputmode="decimal" value="'+(b?b.amount:'')+'" placeholder="0"></div></div></div>'
+function openBudget(catId,grp){const b=catId?S.budgets.find(x=>x.category_id===catId):null;if(catId){const c0=catById(catId);grp=c0?c0.grp:'exp';}grp=grp==='in'?'in':'exp';
+  const cats=S.cats.filter(c=>c.grp===grp&&(c.active||c.id===catId)&&(c.id===catId||!S.budgets.some(x=>x.category_id===c.id)));
+  if(!cats.length){toast(grp==='in'?'ทุกหมวดเงินเข้าตั้งเป้าแล้ว (หรือยังไม่มีหมวด)':'ทุกหมวดตั้งงบแล้ว');return;}
+  const isIn=grp==='in';
+  $('#modal').innerHTML='<div class="mask" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="top"><button class="hbtn" onclick="closeModal()">✕</button><h3>'+(isIn?(b?'แก้ไขเป้ารายรับ':'ตั้งเป้ารายรับ'):(b?'แก้ไขงบ':'ตั้งงบค่าใช้จ่าย'))+'</h3>'+(b?'<button class="hbtn" id="bDel" style="color:var(--out)">🗑</button>':'<span style="width:38px"></span>')+'</div>'
+   +'<div class="fgroup"><div class="frow"><div class="fi">'+(isIn?'⬇':'⬆')+'</div><div class="fx"><div class="lab">'+(isIn?'หมวดเงินเข้า':'หมวดค่าใช้จ่าย')+'</div><select id="bCat"'+(b?' disabled':'')+'>'+cats.map(c=>'<option value="'+c.id+'"'+(c.id===catId?' selected':'')+'>'+esc(c.name)+'</option>').join('')+'</select></div></div>'
+   +'<div class="frow"><span class="cur">THB</span><div class="fx"><div class="lab">'+(isIn?'เป้ารายรับต่อเดือน':'งบต่อเดือน')+' (ใช้ซ้ำทุกเดือน)</div><input id="bAmt" class="amt" inputmode="decimal" value="'+(b?b.amount:'')+'" placeholder="0"></div></div></div>'
    +'<div class="savebar"><button class="btn pri" id="bSave">บันทึก</button></div></div></div>';
   setTimeout(()=>$('#bAmt').focus(),60);
   $('#bSave').onclick=async()=>{const n=calcExpr($('#bAmt').value);if(!isFinite(n)||n<0){toast('ใส่งบให้ถูกต้อง');return;}const cid=+$('#bCat').value;
     try{if(b){const r=await DB.update('cf_budgets',b.id,{amount:n});b.amount=+r.amount;}else{const [r]=await DB.insert('cf_budgets',[{category_id:cid,amount:n}]);S.budgets.push({...r,amount:+r.amount});}}
     catch(e){alert('บันทึกไม่สำเร็จ: '+(e.message||e));return;}closeModal();toast('บันทึกแล้ว');render();};
-  if($('#bDel'))$('#bDel').onclick=async()=>{if(!confirm('ลบงบหมวดนี้?'))return;try{await DB.remove('cf_budgets',b.id);}catch(e){alert(e.message||e);return;}S.budgets=S.budgets.filter(x=>x.id!==b.id);closeModal();render();};}
+  if($('#bDel'))$('#bDel').onclick=async()=>{if(!confirm(isIn?'ลบเป้ารายรับหมวดนี้?':'ลบงบหมวดนี้?'))return;try{await DB.remove('cf_budgets',b.id);}catch(e){alert(e.message||e);return;}S.budgets=S.budgets.filter(x=>x.id!==b.id);closeModal();render();};}
 
 // ===================== หน้า: หมวด =====================
 function renderCats(){let h='';GRP_ORDER.forEach(g=>{h+='<div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">'+GRP[g].label+'<button class="btn sm" data-add="'+g+'">+ เพิ่มหมวด</button></div><div class="card">'
