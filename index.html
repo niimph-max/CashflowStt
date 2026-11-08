@@ -166,7 +166,7 @@ label.f{display:block;font-size:12.5px;color:var(--mute);font-weight:600;margin:
 // anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันจริงคือ RLS (owner = auth.uid()) + ต้อง login
 const CF_SUPABASE_URL = 'https://xgpsdcnqravhouwaktgp.supabase.co';
 const CF_SUPABASE_ANON = 'sb_publishable_HGOrB_SgTUq22r67me1B5Q_KYhNoL7B';   // publishable key (Fillbook)
-const CF_VERSION = '2026-11-08u';
+const CF_VERSION = '2026-11-08v';
 // =============================================================================
 
 const GRP={in:{label:'เงินเข้า',sign:1,color:'#1d9a87',icon:'⬇'},debt:{label:'ชำระหนี้',sign:-1,color:'#b54708',icon:'🏦'},exp:{label:'ค่าใช้จ่าย',sign:-1,color:'#e0304d',icon:'⬆'}};
@@ -697,24 +697,26 @@ function renderBudget(){const [y,mo]=S.ym.split('-').map(Number);const nd=daysIn
   const bar=(b,a,p)=>{const mx=Math.max(b,a+p,1);const over=a+p>b;return '<div style="height:10px;border-radius:6px;background:#e6f2ef;overflow:hidden;display:flex;margin-top:6px"><div style="width:'+(a/mx*100)+'%;background:'+(over?'#e0304d':'#48b9a8')+'"></div><div style="width:'+(p/mx*100)+'%;background:'+(over?'#f5a3a3':'#c4b5fd')+'"></div></div>';};
   /* เป้ารายรับ: ยิ่งได้มากยิ่งดี — ถึงเป้า = เขียว ไม่มีสีแดง */
   const barIn=(b,a,p)=>{const mx=Math.max(b,a+p,1);return '<div style="height:10px;border-radius:6px;background:#e6f2ef;overflow:hidden;display:flex;margin-top:6px"><div style="width:'+(a/mx*100)+'%;background:#1d9a87"></div><div style="width:'+(p/mx*100)+'%;background:#c4b5fd"></div></div>';};
+  const BN=(k,t,btn)=>{const c=k==='in'?['#dff5f0','#1d9a87','⬇']:['#ffe7ec','#e0304d','⬆'];return '<div style="display:flex;align-items:center;gap:10px;margin:14px 0 8px;padding:9px 10px 9px 12px;border-radius:14px;background:'+c[0]+';color:'+c[1]+'"><span style="width:28px;height:28px;border-radius:50%;background:'+c[1]+';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none">'+c[2]+'</span><b style="flex:1;font-size:16px">'+t+'</b><button class="btn sm" style="border-color:'+c[1]+';color:'+c[1]+'" onclick="openBudget(null,\''+k+'\')">'+btn+'</button></div>';};
+  const CD=k=>'<div class="card" style="border-left:5px solid '+(k==='in'?'#1d9a87':'#e0304d')+'">';
   let h=migrateNote();
   if(!ALL.length)h+='<div class="card empty"><div style="font-size:40px">🎯</div><h2>ยังไม่ได้ตั้งงบประมาณ</h2><div>ตั้งงบรายเดือนให้หมวดค่าใช้จ่าย หรือเป้ารายรับให้หมวดเงินเข้า · ใช้ซ้ำทุกเดือน</div><div class="savebar" style="margin-top:14px"><button class="btn pri" onclick="openBudget(null,\'exp\')">+ งบค่าใช้จ่าย</button><button class="btn" onclick="openBudget(null,\'in\')">+ เป้ารายรับ</button></div></div>';
-  if(L.length){h+='<div class="card"><div class="muted">งบค่าใช้จ่ายรวม '+TH_MF[mo]+' '+(y+543)+'</div><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:22px">'+fmt(tb)+'</b><span class="'+(left<0?'neg':'pos')+'" style="font-weight:700">'+(left<0?'เกินงบ ':'เหลือ ')+fmt(Math.abs(left))+'</span></div>'
+  if(L.length){h+=BN('exp','งบรายจ่าย','+ ตั้งงบ')+CD('exp')+'<div class="muted">งบรวม '+TH_MF[mo]+' '+(y+543)+'</div><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:22px">'+fmt(tb)+'</b><span class="'+(left<0?'neg':'pos')+'" style="font-weight:700">'+(left<0?'เกินงบ ':'เหลือ ')+fmt(Math.abs(left))+'</span></div>'
       +bar(tb,ta,tp)+'<div class="muted" style="display:flex;justify-content:space-between;margin-top:6px"><span>ใช้จริง '+fmt(ta)+'</span><span style="color:var(--plan)">ประมาณการ '+fmt(tp)+'</span></div>'
       +(daysLeft&&left>0?'<div class="muted" style="margin-top:4px">เหลือ '+daysLeft+' วัน · ใช้ได้อีกวันละ ≈ '+fmt(left/daysLeft)+'</div>':'')+'</div>';
-    h+='<div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">งบค่าใช้จ่ายตามหมวด<button class="btn sm" onclick="openBudget(null,\'exp\')">+ ตั้งงบ</button></div><div class="card">'
+    h+=CD('exp')
       +L.map(x=>{const rem=x.b.amount-x.u.act-x.u.plan;const pct=x.b.amount?Math.round((x.u.act+x.u.plan)/x.b.amount*100):0;
         return '<div class="row" style="display:block" onclick="openBudget('+x.c.id+')"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>'+esc(x.c.name)+'</b><span class="'+(rem<0?'neg':'')+'" style="font-weight:700;white-space:nowrap">'+(rem<0?'เกิน ':'เหลือ ')+fmt(Math.abs(rem))+'</span></div>'
           +bar(x.b.amount,x.u.act,x.u.plan)+'<div class="muted" style="display:flex;justify-content:space-between;margin-top:4px"><span>'+fmt(x.u.act+x.u.plan)+' / '+fmt(x.b.amount)+'</span><span>'+pct+'%</span></div></div>';}).join('')+'</div>';}
-  else if(ALL.length)h+='<div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">งบค่าใช้จ่าย<button class="btn sm" onclick="openBudget(null,\'exp\')">+ ตั้งงบ</button></div>';
+  else if(ALL.length)h+=BN('exp','งบรายจ่าย','+ ตั้งงบ');
   if(LI.length){const ib=LI.reduce((s,x)=>s+x.b.amount,0),ia=LI.reduce((s,x)=>s+x.u.act,0),ip=LI.reduce((s,x)=>s+x.u.plan,0);const gap=ib-ia-ip;
-    h+='<div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">เป้ารายรับ<button class="btn sm" onclick="openBudget(null,\'in\')">+ ตั้งเป้า</button></div><div class="card">'
+    h+=BN('in','เป้ารายรับ','+ ตั้งเป้า')+CD('in')
       +'<div class="muted">เป้ารวม '+TH_MF[mo]+' '+(y+543)+'</div><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:22px">'+fmt(ib)+'</b><span class="'+(gap<=0?'pos':'')+'" style="font-weight:700">'+(gap<=0?'ถึงเป้า ✓ เกิน ':'ขาดอีก ')+fmt(Math.abs(gap))+'</span></div>'
-      +barIn(ib,ia,ip)+'<div class="muted" style="display:flex;justify-content:space-between;margin-top:6px"><span>ได้รับจริง '+fmt(ia)+'</span><span style="color:var(--plan)">ประมาณการ '+fmt(ip)+'</span></div></div><div class="card">'
+      +barIn(ib,ia,ip)+'<div class="muted" style="display:flex;justify-content:space-between;margin-top:6px"><span>ได้รับจริง '+fmt(ia)+'</span><span style="color:var(--plan)">ประมาณการ '+fmt(ip)+'</span></div></div>'+CD('in')
       +LI.map(x=>{const gp=x.b.amount-x.u.act-x.u.plan;const pct=x.b.amount?Math.round((x.u.act+x.u.plan)/x.b.amount*100):0;
         return '<div class="row" style="display:block" onclick="openBudget('+x.c.id+')"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>'+esc(x.c.name)+'</b><span class="'+(gp<=0?'pos':'')+'" style="font-weight:700;white-space:nowrap">'+(gp<=0?'ถึงเป้า ✓':'ขาดอีก '+fmt(gp))+'</span></div>'
           +barIn(x.b.amount,x.u.act,x.u.plan)+'<div class="muted" style="display:flex;justify-content:space-between;margin-top:4px"><span>'+fmt(x.u.act+x.u.plan)+' / '+fmt(x.b.amount)+'</span><span>'+pct+'%</span></div></div>';}).join('')+'</div>';}
-  else if(ALL.length)h+='<div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">เป้ารายรับ<button class="btn sm" onclick="openBudget(null,\'in\')">+ ตั้งเป้า</button></div>';
+  else if(ALL.length)h+=BN('in','เป้ารายรับ','+ ตั้งเป้า');
   const un=S.cats.filter(c=>c.grp==='exp'&&!S.budgets.some(b=>b.category_id===c.id)&&U[c.id]);
   if(un.length)h+='<div class="sec-t">ใช้จ่ายในหมวดที่ยังไม่ตั้งงบ</div><div class="card">'+un.map(c=>'<div class="row" onclick="openBudget('+c.id+')"><div class="m"><div class="c" style="font-weight:600">'+esc(c.name)+'</div><div class="n">แตะเพื่อตั้งงบ</div></div><div class="a neg">'+fmt(U[c.id].act+U[c.id].plan)+'</div></div>').join('')+'</div>';
   h+='<div class="muted" style="padding:0 4px">สีเขียว = จ่าย/รับจริงแล้ว · สีม่วง = ประมาณการ · งบและเป้าใช้ซ้ำทุกเดือน · นับตามบัญชีที่เลือกด้านบน</div>';
