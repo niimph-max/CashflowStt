@@ -36,11 +36,12 @@ nav.tabs button.on{background:#e9f7ef;color:var(--brand2)}
 .fab{position:fixed;right:18px;bottom:calc(88px + env(safe-area-inset-bottom));z-index:21;width:58px;height:58px;border-radius:50%;border:none;background:var(--brand2);color:#fff;font-size:32px;line-height:1;box-shadow:0 6px 18px rgba(22,163,74,.4);cursor:pointer}
 .card{background:var(--card);border-radius:20px;padding:14px 16px;margin-bottom:12px}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.kpi{background:var(--card);border-radius:16px;padding:12px 14px}
+.kpi{background:var(--card);border-radius:16px;padding:12px 14px;min-width:0}
 .kpi .k{font-size:12.5px;color:var(--mute);font-weight:600}
 .kpi .v{font-size:21px;font-weight:800;margin-top:2px}
 .kpi .s{font-size:12px;color:var(--mute);margin-top:2px}
-@media(max-width:560px){.kpi{padding:10px}.kpi .v{font-size:16px}.kpi .k{font-size:11.5px}.kpi .s{font-size:11px}}
+@media(max-width:560px){.kpi{padding:9px 8px}.kpi .v{font-size:14px;letter-spacing:-.3px}.kpi .k{font-size:11px}.kpi .s{font-size:10.5px}}
+@media(max-width:385px){.kpis{grid-template-columns:1fr;gap:6px}.kpi{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:10px;padding:9px 14px}.kpi .k{grid-column:1;font-size:12.5px}.kpi .s{grid-column:1;font-size:11px}.kpi .v{grid-column:2;grid-row:1 / span 2;font-size:17px;margin:0}}
 .neg{color:var(--out)!important}.pos{color:var(--in)}
 .alert{border-radius:14px;padding:10px 14px;margin-bottom:12px;font-weight:600}
 .alert.bad{background:var(--warnbg);color:var(--out)}
@@ -160,7 +161,7 @@ label.f{display:block;font-size:12.5px;color:var(--mute);font-weight:600;margin:
 // anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันจริงคือ RLS (owner = auth.uid()) + ต้อง login
 const CF_SUPABASE_URL = 'https://xgpsdcnqravhouwaktgp.supabase.co';
 const CF_SUPABASE_ANON = 'sb_publishable_HGOrB_SgTUq22r67me1B5Q_KYhNoL7B';   // publishable key (Fillbook)
-const CF_VERSION = '2026-11-08d';
+const CF_VERSION = '2026-11-08f';
 // =============================================================================
 
 const GRP={in:{label:'เงินเข้า',sign:1,color:'#067647',icon:'⬇'},debt:{label:'ชำระหนี้',sign:-1,color:'#b54708',icon:'🏦'},exp:{label:'ค่าใช้จ่าย',sign:-1,color:'#c0262d',icon:'⬆'}};
@@ -179,7 +180,7 @@ const pad=n=>String(n).padStart(2,'0');
 const isoOf=dt=>dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate());
 const todayIso=()=>isoOf(new Date());
 const fmt=n=>(Math.round((+n||0)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-const fmt0=n=>Math.round(+n||0).toLocaleString('en-US');
+const fmt0=fmt;   // ผู้ใช้ขอทศนิยม 2 ตำแหน่งทุกจุด (08/11/2026)
 const thD=iso=>{const p=iso.split('-');return (+p[2])+' '+TH_M[+p[1]];};
 const thDY=iso=>{const p=iso.split('-');return (+p[2])+' '+TH_M[+p[1]]+' '+(+p[0]+543);};
 const thDW=iso=>TH_DW[new Date(iso+'T00:00:00').getDay()]+', '+thDY(iso);
