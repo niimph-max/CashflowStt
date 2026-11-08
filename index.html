@@ -167,7 +167,7 @@ label.f{display:block;font-size:12.5px;color:var(--mute);font-weight:600;margin:
 // anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันจริงคือ RLS (owner = auth.uid()) + ต้อง login
 const CF_SUPABASE_URL = 'https://xgpsdcnqravhouwaktgp.supabase.co';
 const CF_SUPABASE_ANON = 'sb_publishable_HGOrB_SgTUq22r67me1B5Q_KYhNoL7B';   // publishable key (Fillbook)
-const CF_VERSION = '2026-11-08j';
+const CF_VERSION = '2026-11-08k';
 // =============================================================================
 
 const GRP={in:{label:'เงินเข้า',sign:1,color:'#067647',icon:'⬇'},debt:{label:'ชำระหนี้',sign:-1,color:'#b54708',icon:'🏦'},exp:{label:'ค่าใช้จ่าย',sign:-1,color:'#c0262d',icon:'⬆'}};
@@ -474,7 +474,7 @@ function openTx(id,preset,ruleId){const t=id?S.txns.find(x=>x.id===id):null;cons
     f+='<div class="fgroup">'
       +(k==='loan'?'<div class="frow"><div class="fi">🤝</div><div class="fx"><div class="lab">'+(v.loan_type==='lend'||v.loan_type==='collect'?'ผู้ยืม (ลูกหนี้)':'เจ้าหนี้')+'</div><select id="fParty">'+S.parties.filter(p=>p.active||p.id===v.party_id).map(p=>'<option value="'+p.id+'"'+(p.id===v.party_id?' selected':'')+'>'+esc(p.name)+'</option>').join('')+'<option value="new">+ เพิ่มชื่อใหม่…</option></select><div class="muted" id="fOut"></div></div><span class="chev">›</span></div>':'')
       +'<div class="frow"><div class="fi">👛</div><div class="fx"><div class="lab">'+(k==='transfer'?'จากบัญชี':'บัญชี')+'</div><select id="fAcct">'+acctOpts(v.account_id)+'</select></div><span class="chev">›</span></div>'
-      +(k==='transfer'?'<div class="frow"><div class="fi">➡️</div><div class="fx"><div class="lab">ไปบัญชี</div><select id="fTo">'+acctOpts(v.to_account_id,v.account_id)+'</select></div><span class="chev">›</span></div>':'')
+      +(k==='transfer'?'<div class="frow" style="position:relative"><button type="button" id="fSwap" title="สลับบัญชีต้นทาง/ปลายทาง" style="position:absolute;right:30px;top:-19px;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--xfer);font-size:20px;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,.12);cursor:pointer;z-index:2">⇅</button><div class="fi">➡️</div><div class="fx"><div class="lab">ไปบัญชี</div><select id="fTo">'+acctOpts(v.to_account_id,v.account_id)+'</select></div><span class="chev">›</span></div>':'')
       +(k==='adjust'&&!t?'<div class="frow"><div class="fi">🧮</div><div class="fx"><div class="lab">ยอดตามระบบ ณ วันที่เลือก</div><div style="font-weight:700" id="fSys"></div></div></div>':'')
       +'<div class="frow"><span class="cur">THB</span><div class="fx"><div class="lab">'+(k==='adjust'?(t?'ยอดปรับ (+ เพิ่ม / − ลด)':'ยอดจริงตาม statement'):'ยอดเงิน · พิมพ์ 1000+250 ได้')+'</div><input id="fAmt" class="amt" inputmode="decimal" value="'+esc(v.amount===''?'':v.amount)+'" placeholder="0"><div id="fAmtV" class="muted"></div></div></div>'
       +(isFlow?'<div class="frow"><div class="fi">'+GRP[k].icon+'</div><div class="fx"><div class="lab">หมวด</div><select id="fCat">'+cats.map(c=>'<option value="'+c.id+'"'+(c.id===v.category_id?' selected':'')+'>'+esc(c.name)+'</option>').join('')+'</select></div><span class="chev">›</span></div>':'')
@@ -496,6 +496,8 @@ function openTx(id,preset,ruleId){const t=id?S.txns.find(x=>x.id===id):null;cons
         try{const [r]=await DB.insert('cf_parties',[{name:n,opening_debt:0,sort:S.parties.length,active:true}]);S.parties.push({...r,opening_debt:+r.opening_debt});keep();v.party_id=r.id;draw();}catch(e){alert(/duplicate|unique/i.test(e.message||'')?'มีชื่อนี้แล้ว':(e.message||e));}return;}showOut();};}
     $('#fAcct').onchange=()=>{keep();if(k==='transfer')draw();else showV();};
     if($('#fFreq'))$('#fFreq').onchange=()=>{keep();draw();};
+    if($('#fSwap'))$('#fSwap').onclick=()=>{keep();const x=v.account_id;v.account_id=v.to_account_id;v.to_account_id=x;draw();};
+    if($('#fTo'))$('#fTo').onchange=()=>keep();
     const amt=$('#fAmt'),av=$('#fAmtV');
     const showV=()=>{const n=calcExpr(amt.value);let s=/[+*/]|.-/.test(amt.value)&&isFinite(n)?'= '+fmt(n):'';
       if(k==='adjust'&&!t){const a=acctById(+$('#fAcct').value);const sys=acctBalance(a,$('#fD').value,true);$('#fSys').textContent=fmt(sys);if(isFinite(n))s='จะปรับ '+(n-sys>=0?'+':'−')+fmt(Math.abs(n-sys));}av.textContent=s;};
