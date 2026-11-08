@@ -167,7 +167,7 @@ label.f{display:block;font-size:12.5px;color:var(--mute);font-weight:600;margin:
 // anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันจริงคือ RLS (owner = auth.uid()) + ต้อง login
 const CF_SUPABASE_URL = 'https://xgpsdcnqravhouwaktgp.supabase.co';
 const CF_SUPABASE_ANON = 'sb_publishable_HGOrB_SgTUq22r67me1B5Q_KYhNoL7B';   // publishable key (Fillbook)
-const CF_VERSION = '2026-11-08m';
+const CF_VERSION = '2026-11-08n';
 // =============================================================================
 
 const GRP={in:{label:'เงินเข้า',sign:1,color:'#067647',icon:'⬇'},debt:{label:'ชำระหนี้',sign:-1,color:'#b54708',icon:'🏦'},exp:{label:'ค่าใช้จ่าย',sign:-1,color:'#c0262d',icon:'⬆'}};
@@ -192,6 +192,8 @@ const thDY=iso=>{const p=iso.split('-');return (+p[2])+' '+TH_M[+p[1]]+' '+(+p[0
 const thDW=iso=>TH_DW[new Date(iso+'T00:00:00').getDay()]+', '+thDY(iso);
 const daysIn=(y,m)=>new Date(y,m,0).getDate();
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// ช่อง <input type=date> ต้องเป็น ค.ศ. — ถ้าพิมพ์ปี พ.ศ. (เช่น 2569) จะได้ปี ค.ศ. 2569 → แปลงกลับ (−543)
+const fixYear=iso=>{if(!iso||typeof iso!=='string')return iso;const y=+iso.slice(0,4);return y>=2400?(y-543)+iso.slice(4):iso;};
 const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return isoOf(d);};
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}};
@@ -258,6 +260,12 @@ async function loadAll(){
   S.accts=accts.map(a=>({...a,opening_balance:+a.opening_balance})).sort((a,b)=>a.sort-b.sort||a.id-b.id);
   S.cats=cats.sort((a,b)=>GRP_ORDER.indexOf(a.grp)-GRP_ORDER.indexOf(b.grp)||a.sort-b.sort||a.id-b.id);
   S.txns=txns.map(t=>({...t,amount:+t.amount}));
+  // แก้วันที่ที่บันทึกเป็นปี พ.ศ. ไปแล้ว (ปี ≥ 2400) — แปลงเป็น ค.ศ. ใน DB ทันที
+  let fixed=0;
+  for(const a of S.accts){const f=fixYear(a.opening_date);if(f!==a.opening_date){try{await DB.update('cf_accounts',a.id,{opening_date:f});a.opening_date=f;fixed++;}catch(e){}}}
+  for(const t of S.txns){const f=fixYear(t.d);if(f!==t.d){try{await DB.update('cf_txns',t.id,{d:f});t.d=f;fixed++;}catch(e){}}}
+  for(const r of S.recur){const sd=fixYear(r.start_date),ed=fixYear(r.end_date),gu=fixYear(r.gen_until);if(sd!==r.start_date||ed!==r.end_date||gu!==r.gen_until){try{await DB.update('cf_recurring',r.id,{start_date:sd,end_date:ed||null,gen_until:gu||null});Object.assign(r,{start_date:sd,end_date:ed,gen_until:gu});fixed++;}catch(e){}}}
+  if(fixed)setTimeout(()=>toast('แก้ปี พ.ศ. → ค.ศ. ให้แล้ว '+fixed+' รายการ'),800);
   if(S.wallet!=='all'&&!acctById(S.wallet))S.wallet='all';
   if(!S.cats.length){const rows=[];GRP_ORDER.forEach(g=>DEFAULT_CATS[g].forEach((n,i)=>rows.push({grp:g,name:n,sort:i,active:true})));S.cats=await DB.insert('cf_categories',rows);
     if(!S.parties.length)S.parties=(await DB.insert('cf_parties',DEFAULT_PARTIES.map((n,i)=>({name:n,opening_debt:0,sort:i,active:true})))).map(p=>({...p,opening_debt:+p.opening_debt}));}
@@ -532,14 +540,14 @@ function openTx(id,preset,ruleId){const t=id?S.txns.find(x=>x.id===id):null;cons
       if(k==='adjust'&&!t){const a=acctById(+$('#fAcct').value);const sys=acctBalance(a,$('#fD').value,true);$('#fSys').textContent=fmt(sys);if(isFinite(n))s='จะปรับ '+(n-sys>=0?'+':'−')+fmt(Math.abs(n-sys));}av.textContent=s;};
     amt.oninput=showV;showV();
     const setD=d=>{$('#fD').value=d;$('#fDLab').textContent=thDW(d);if($('#fPlan'))$('#fPlan').checked=d>today?true:$('#fPlan').checked;showV();};
-    $('#fD').onchange=()=>setD($('#fD').value);$('#fPrev').onclick=()=>setD(addDays($('#fD').value,-1));$('#fNext').onclick=()=>setD(addDays($('#fD').value,1));
+    $('#fD').onchange=()=>setD(fixYear($('#fD').value));$('#fPrev').onclick=()=>setD(addDays($('#fD').value,-1));$('#fNext').onclick=()=>setD(addDays($('#fD').value,1));
     $('#fSave').onclick=()=>save(false);if($('#fSaveMore'))$('#fSaveMore').onclick=()=>save(true);
     if(R)$('#fDel').onclick=async()=>{if(!confirm('ลบรายการประจำนี้?\nรายการประมาณการล่วงหน้าที่ยังไม่ยืนยันจะถูกลบด้วย · รายการที่ยืนยันแล้วยังอยู่'))return;
       try{await DB.removeRecurringFuture(R.id,'0000-01-01');await DB.remove('cf_recurring',R.id);}catch(e){alert(e.message||e);return;}
       S.txns=S.txns.filter(x=>!(x.recurring_id===R.id&&x.planned));S.txns.forEach(x=>{if(x.recurring_id===R.id)x.recurring_id=null;});S.recur=S.recur.filter(x=>x.id!==R.id);closeModal();toast('ลบแล้ว');render();};
     else if(t)$('#fDel').onclick=async()=>{if(!confirm('ลบรายการนี้?'+((t.attachments||[]).length?'\n(สลิปที่แนบจะถูกลบด้วย)':'')))return;try{await DB.remove('cf_txns',t.id);if((t.attachments||[]).length)await DB.removeFiles(t.attachments).catch(()=>{});}catch(e){alert(e.message||e);return;}S.txns=S.txns.filter(x=>x.id!==t.id);closeModal();toast('ลบแล้ว');render();};
     if(!t)setTimeout(()=>amt.focus(),60);};
-  const keep=()=>{if($('#fParty')&&$('#fParty').value!=='new')v.party_id=+$('#fParty').value||null;v.account_id=+$('#fAcct').value||null;if($('#fTo'))v.to_account_id=+$('#fTo').value||null;if($('#fCat'))v.category_id=+$('#fCat').value||null;v.amount=$('#fAmt').value;v.note=$('#fNote').value;v.d=$('#fD').value;if($('#fPlan'))v.planned=$('#fPlan').checked;if($('#fFreq'))v.freq=$('#fFreq').value;if($('#fEnd'))v.end=$('#fEnd').value;};
+  const keep=()=>{if($('#fParty')&&$('#fParty').value!=='new')v.party_id=+$('#fParty').value||null;v.account_id=+$('#fAcct').value||null;if($('#fTo'))v.to_account_id=+$('#fTo').value||null;if($('#fCat'))v.category_id=+$('#fCat').value||null;v.amount=$('#fAmt').value;v.note=$('#fNote').value;v.d=fixYear($('#fD').value);if($('#fPlan'))v.planned=$('#fPlan').checked;if($('#fFreq'))v.freq=$('#fFreq').value;if($('#fEnd'))v.end=fixYear($('#fEnd').value);};
   const save=async more=>{keep();const k=v.kindUi;const n=calcExpr(v.amount);
     if(!v.account_id){toast('เลือกบัญชี');return;}if(!v.d){toast('เลือกวันที่');return;}if(!isFinite(n)){toast('ใส่ยอดเงินให้ถูกต้อง');return;}
     const row={d:v.d,account_id:v.account_id,note:v.note.trim(),planned:k==='adjust'?false:!!v.planned};
@@ -600,18 +608,19 @@ function openWallet(id){const a=id?acctById(id):null;const v=a?{...a}:{name:'',o
   $('#modal').innerHTML='<div class="mask" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="top"><button class="hbtn" onclick="closeModal()">✕</button><h3>'+(a?'แก้ไขบัญชี':'เพิ่มบัญชี')+'</h3><span style="width:38px"></span></div>'
    +'<div class="fgroup"><div class="frow"><div class="fi">👛</div><div class="fx"><div class="lab">ชื่อบัญชี</div><input id="wName" value="'+esc(v.name)+'" placeholder="เช่น SCB 283961 / Kbank 33151-8 / เงินสด"></div></div>'
    +'<div class="frow"><span class="cur">THB</span><div class="fx"><div class="lab">ยอดตั้งต้น (ตาม statement ณ วันที่ด้านล่าง)</div><input id="wBal" class="amt" inputmode="decimal" value="'+esc(v.opening_balance)+'" placeholder="0"></div></div>'
-   +'<div class="frow"><div class="fi">📅</div><div class="fx"><div class="lab">ยอดตั้งต้น ณ วันที่</div><input id="wDate" type="date" value="'+v.opening_date+'"></div></div></div>'
+   +'<div class="frow"><div class="fi">📅</div><div class="fx"><div class="lab">ยอดตั้งต้น ณ วันที่ (สิ้นวัน)</div><input id="wDate" type="date" value="'+v.opening_date+'"><div class="muted" id="wDateTh">'+thDY(v.opening_date)+'</div></div></div></div>'
    +'<div class="fgroup"><div class="frow"><label class="sw"><input type="checkbox" id="wInc"'+(v.in_total?' checked':'')+'> รวมใน Total</label></div>'
    +(a?'<div class="frow"><label class="sw"><input type="checkbox" id="wHide"'+(v.active?'':' checked')+'> ซ่อนบัญชีนี้ (ปิดบัญชีแล้ว)</label></div>':'')+'</div>'
    +'<div class="savebar"><button class="btn pri" id="wSave">บันทึก</button></div>'
    +(a?'<div class="savebar"><button class="btn" id="wAdj">⚖ ปรับยอดให้ตรง statement</button></div>'+(used?'':'<div class="savebar"><button class="btn danger" id="wDel">ลบบัญชี</button></div>'):'')
    +'</div></div>';
   $('#wSave').onclick=async()=>{const name=$('#wName').value.trim();if(!name){toast('ใส่ชื่อบัญชี');return;}const bal=$('#wBal').value.trim()?calcExpr($('#wBal').value):0;if(!isFinite(bal)){toast('ยอดตั้งต้นไม่ถูกต้อง');return;}
-    const row={name,opening_balance:bal,opening_date:$('#wDate').value||todayIso(),in_total:$('#wInc').checked,active:a?!$('#wHide').checked:true};
+    const row={name,opening_balance:bal,opening_date:fixYear($('#wDate').value)||todayIso(),in_total:$('#wInc').checked,active:a?!$('#wHide').checked:true};
     try{if(a){const r=await DB.update('cf_accounts',a.id,row);Object.assign(a,{...r,opening_balance:+r.opening_balance});}
         else{row.sort=S.accts.length;const [r]=await DB.insert('cf_accounts',[row]);S.accts.push({...r,opening_balance:+r.opening_balance});}}
     catch(e){alert('บันทึกไม่สำเร็จ: '+(/duplicate|unique/i.test(e.message||'')?'มีบัญชีชื่อนี้แล้ว':(e.message||e)));return;}
     closeModal();toast('บันทึกแล้ว');render();};
+  $('#wDate').onchange=()=>{const f=fixYear($('#wDate').value);if(f&&f!==$('#wDate').value)$('#wDate').value=f;$('#wDateTh').textContent=f?thDY(f):'';};
   if($('#wAdj'))$('#wAdj').onclick=()=>{closeModal();openTx(null,{kind:'adjust',account_id:a.id});};
   if($('#wDel'))$('#wDel').onclick=async()=>{if(!confirm('ลบบัญชี "'+a.name+'"?'))return;try{await DB.remove('cf_accounts',a.id);}catch(e){alert(e.message||e);return;}S.accts=S.accts.filter(x=>x.id!==a.id);if(S.wallet===a.id){S.wallet='all';lsSet('cf_wallet','all');}closeModal();render();};}
 function openWalletPicker(){const today=todayIso();const inc=S.accts.filter(a=>a.active&&a.in_total),exc=S.accts.filter(a=>a.active&&!a.in_total);const total=inc.reduce((s,a)=>s+acctBalance(a,today,true),0);
