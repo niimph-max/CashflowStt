@@ -155,7 +155,6 @@ label.f{display:block;font-size:12.5px;color:var(--mute);font-weight:600;margin:
   <nav class="tabs">
     <button data-tab="home" class="on"><b>🏠</b>ภาพรวม</button>
     <button data-tab="list"><b>🧾</b>รายการ</button>
-    <button data-tab="grid"><b>📅</b>ตาราง</button>
     <button data-tab="budget"><b>🎯</b>งบ</button>
     <button data-tab="more"><b>👤</b>เพิ่มเติม</button>
   </nav>
@@ -167,7 +166,7 @@ label.f{display:block;font-size:12.5px;color:var(--mute);font-weight:600;margin:
 // anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันจริงคือ RLS (owner = auth.uid()) + ต้อง login
 const CF_SUPABASE_URL = 'https://xgpsdcnqravhouwaktgp.supabase.co';
 const CF_SUPABASE_ANON = 'sb_publishable_HGOrB_SgTUq22r67me1B5Q_KYhNoL7B';   // publishable key (Fillbook)
-const CF_VERSION = '2026-11-08n';
+const CF_VERSION = '2026-11-08o';
 // =============================================================================
 
 const GRP={in:{label:'เงินเข้า',sign:1,color:'#067647',icon:'⬇'},debt:{label:'ชำระหนี้',sign:-1,color:'#b54708',icon:'🏦'},exp:{label:'ค่าใช้จ่าย',sign:-1,color:'#c0262d',icon:'⬆'}};
@@ -324,7 +323,7 @@ function monthsRange(){const now=todayIso().slice(0,7);let first=now,last=now;
 function renderMonthBar(){const bar=$('#monthBar');const show=['home','list','grid','budget'].includes(S.tab);bar.classList.toggle('hide',!show);if(!show)return;
   const now=todayIso().slice(0,7);bar.innerHTML=monthsRange().map(k=>{const [y,m]=k.split('-');const lab=k===now?'เดือนนี้':TH_M[+m]+' '+String(+y+543).slice(2);return '<button class="'+(k===S.ym?'on':'')+'" data-m="'+k+'">'+lab+'</button>';}).join('');
   bar.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.ym=b.dataset.m;render();});const on=bar.querySelector('.on');if(on)on.scrollIntoView({inline:'center',block:'nearest'});}
-function render(){const navTab=['wallets','cats','debts','recur'].includes(S.tab)?'more':S.tab;document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===navTab));
+function render(){const navTab=['wallets','cats','debts','recur','grid'].includes(S.tab)?'more':S.tab;   // ตาราง Cashflow ย้ายไปอยู่ในเมนูเพิ่มเติมdocument.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===navTab));
   renderHeader();renderMonthBar();$('#fab').classList.toggle('hide',!['home','list','grid','budget'].includes(S.tab)||!S.accts.length);
   if(!S.accts.length&&['home','list','grid','budget'].includes(S.tab)){$('#main').innerHTML='<div class="card empty"><div style="font-size:40px">👛</div><h2>ยังไม่มีบัญชี</h2><div>เพิ่มบัญชีแรก (เช่น SCB / Kbank / เงินสด) พร้อมยอดคงเหลือตั้งต้น</div><div class="savebar" style="margin-top:14px"><button class="btn pri" onclick="openWallet(null)">+ เพิ่มบัญชี</button></div></div>';return;}
   ({home:renderHome,list:renderList,grid:renderGrid,more:renderMore,wallets:renderWallets,cats:renderCats,debts:renderDebts,recur:renderRecur,budget:renderBudget})[S.tab]();}
@@ -403,7 +402,7 @@ function renderGrid(){const [y,mo]=S.ym.split('-').map(Number);const nd=daysIn(y
     else other[dd]+=e;});
   scopeAccts().forEach(a=>{if(a.opening_date.slice(0,7)===S.ym)other[+a.opening_date.slice(8)]+=a.opening_balance;});
   const days=[...Array(nd)].map((_,i)=>i+1);const usedC=new Set(mTx.filter(t=>t.kind==='flow').map(t=>t.category_id));const usedP=new Set(mTx.filter(t=>t.kind==='loan').map(t=>t.party_id));
-  let h='<div class="toolbar"><b>'+TH_MF[mo]+' '+(y+543)+'</b><span class="muted">แตะช่องเพื่อดู/เพิ่ม · สีม่วง = มีประมาณการ</span><span style="flex:1"></span><button class="btn sm pri" onclick="openExportGrid()">⬇ ตาราง Cashflow (Excel)</button></div>';
+  let h='<div class="toolbar"><button class="btn sm" onclick="S.tab=\'more\';render()">‹ เพิ่มเติม</button><b>'+TH_MF[mo]+' '+(y+543)+'</b><span class="muted">แตะช่องเพื่อดู/เพิ่ม · สีม่วง = มีประมาณการ</span><span style="flex:1"></span><button class="btn sm pri" onclick="openExportGrid()">⬇ ตาราง Cashflow (Excel)</button></div>';
   h+='<div class="gridwrap"><table class="g"><thead><tr><th class="c0">วันที่</th>'+days.map(d=>{const w=new Date(y,mo-1,d).getDay();return '<th class="'+(iso(d)===today?'today ':'')+(w===0||w===6?'we':'')+'">'+d+'</th>';}).join('')+'<th>รวม</th></tr></thead><tbody>';
   const section=(label,rows)=>{const col=days.map(()=>0);let gT=0;h+='<tr class="sec"><td class="c0">'+label+'</td>'+days.map(()=>'<td></td>').join('')+'<td></td></tr>';
     rows.forEach(r=>{let rT=0;h+='<tr><td class="c0">'+esc(r.name)+'</td>'+days.map((d,i)=>{const k=r.key+'|'+d,v=cell[k]||0;rT+=v;col[i]+=v;
@@ -584,7 +583,7 @@ function renderMore(){const today=todayIso();const total=S.accts.filter(a=>a.act
   let h='<div class="card prof"><div class="av">'+esc((S.email||'?').charAt(0).toUpperCase())+'</div><div style="font-weight:700">'+esc(S.email)+'</div><div class="muted">Cashflow บริษัท · ใช้คนเดียว</div></div>';
   h+='<div class="card">'+item('👛','กระเป๋าเงินของฉัน',S.accts.filter(a=>a.active).length+' บัญชี · Total ฿ '+fmt(total),"S.tab='wallets';render()")+item('🗂','หมวดรายรับ-รายจ่าย',S.cats.filter(c=>c.active).length+' หมวด',"S.tab='cats';render()")+item('🤝','หนี้ / เงินยืม',debtSummary(),"S.tab='debts';render()")+item('🔁','รายการประจำ',S.recur.filter(r=>r.active).length+' รายการ · สร้างประมาณการล่วงหน้า '+REC_AHEAD+' วัน',"S.tab='recur';render()")+item('🎯','งบประมาณ',S.budgets.length+' หมวด',"S.tab='budget';render()")+'</div>';
   h+='<div class="card">'+item('⇄','โอนเงินระหว่างบัญชี','',"openTx(null,{kind:'transfer'})")+item('⚖','ปรับยอดให้ตรง statement','',"openTx(null,{kind:'adjust'})")+'</div>';
-  h+='<div class="card">'+item('⚠️','เกณฑ์เตือนเงินต่ำ','เตือนเมื่อคาดว่า Total จะต่ำกว่า ฿ '+fmt0(S.settings.warn_below||0),'openWarn()')+item('📊','ส่งออกตาราง Cashflow (Excel)','หน้าตาเหมือนไฟล์ Cashflow เดิม · 1 แผ่นต่อเดือน','openExportGrid()')+item('📤','สำรองข้อมูล (CSV)','รายการทั้งหมด + ยอดแต่ละบัญชี','exportAll()')+'</div>';
+  h+='<div class="card">'+item('⚠️','เกณฑ์เตือนเงินต่ำ','เตือนเมื่อคาดว่า Total จะต่ำกว่า ฿ '+fmt0(S.settings.warn_below||0),'openWarn()')+item('📅','ตาราง Cashflow รายเดือน','หมวด × วันที่ แบบไฟล์ Excel เดิม',"S.tab='grid';render();window.scrollTo(0,0)")+item('📊','ส่งออกตาราง Cashflow (Excel)','หน้าตาเหมือนไฟล์ Cashflow เดิม · 1 แผ่นต่อเดือน','openExportGrid()')+item('📤','สำรองข้อมูล (CSV)','รายการทั้งหมด + ยอดแต่ละบัญชี','exportAll()')+'</div>';
   h+='<div class="card">'+item('⎋','<span class="neg">ออกจากระบบ</span>','','DB.logout()','')+'</div>';
   h+='<div class="muted" style="text-align:center">เวอร์ชัน '+CF_VERSION+'</div>';
   $('#main').innerHTML=h;}
