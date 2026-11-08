@@ -9,7 +9,8 @@
 - ทดลองโดยไม่ต่อฐานข้อมูล: เปิด `index.html?demo`
 
 ## ตั้งค่าครั้งแรก
-1. Supabase (Fillbook) → SQL Editor → รัน `schema.sql` ทั้งไฟล์
+1. Supabase (Fillbook) → SQL Editor → รัน `schema.sql` ทั้งไฟล์ แล้วรัน `migrate_03_slips.sql` (ที่เก็บสลิป)
+   (ติดตั้งก่อน 08/11/2026: รัน `migrate_02_recurring_budget.sql` และ `migrate_03_slips.sql` เพิ่ม)
 2. Authentication → Add user (อีเมล + รหัสผ่านของเจ้าของ) · ปิด sign-up สาธารณะ
 3. ใส่ Project URL + anon key ที่ `CF_SUPABASE_URL` / `CF_SUPABASE_ANON` ใน `index.html`
    (anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันคือ RLS `owner = auth.uid()` · **ห้ามใส่ service_role key**)
@@ -24,3 +25,6 @@
 | adjust | ปรับยอดให้ตรง statement | โอน/ปรับยอด |
 
 ยอดบัญชี = ยอดตั้งต้น + รายการที่ยืนยันแล้ว · ยอดคาดการณ์/ตาราง = นับรายการประมาณการด้วย (เหมือน Excel เดิม)
+
+## สลิป
+รูปเก็บใน Storage bucket `cf-slips` (private · path = `<user id>/<รหัสรายการ>/...jpg`) · แอปย่อรูปก่อนอัปโหลด (ด้านยาว 1400 px, JPEG) · รายชื่อไฟล์อยู่ใน `cf_txns.attachments`

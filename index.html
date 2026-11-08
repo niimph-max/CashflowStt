@@ -167,7 +167,7 @@ label.f{display:block;font-size:12.5px;color:var(--mute);font-weight:600;margin:
 // anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันจริงคือ RLS (owner = auth.uid()) + ต้อง login
 const CF_SUPABASE_URL = 'https://xgpsdcnqravhouwaktgp.supabase.co';
 const CF_SUPABASE_ANON = 'sb_publishable_HGOrB_SgTUq22r67me1B5Q_KYhNoL7B';   // publishable key (Fillbook)
-const CF_VERSION = '2026-11-08l';
+const CF_VERSION = '2026-11-08m';
 // =============================================================================
 
 const GRP={in:{label:'เงินเข้า',sign:1,color:'#067647',icon:'⬇'},debt:{label:'ชำระหนี้',sign:-1,color:'#b54708',icon:'🏦'},exp:{label:'ค่าใช้จ่าย',sign:-1,color:'#c0262d',icon:'⬆'}};
@@ -223,12 +223,29 @@ const DB={
   // ลบรายการประมาณการล่วงหน้าของรายการประจำ (ตั้งแต่ fromIso) — รายการที่ยืนยันแล้วไม่แตะ
   async removeRecurringFuture(rid,fromIso){if(DEMO){MEM.cf_txns=MEM.cf_txns.filter(x=>!(x.recurring_id===rid&&x.planned&&x.d>=fromIso));return;}
     const {error}=await sb.from('cf_txns').delete().eq('recurring_id',rid).eq('planned',true).gte('d',fromIso);if(error)throw error;},
+  // ===== สลิป: Supabase Storage bucket cf-slips (private) =====
+  async upload(path,blob){if(DEMO){MEM._files=MEM._files||{};MEM._files[path]=URL.createObjectURL(blob);return;}
+    const {error}=await sb.storage.from('cf-slips').upload(path,blob,{contentType:'image/jpeg',upsert:false});if(error)throw error;},
+  async signedUrls(paths){if(!paths.length)return {};if(DEMO){const o={};paths.forEach(p=>o[p]=(MEM._files||{})[p]||'');return o;}
+    const {data,error}=await sb.storage.from('cf-slips').createSignedUrls(paths,3600);if(error)throw error;const o={};(data||[]).forEach(x=>{if(x.signedUrl)o[x.path]=x.signedUrl;});return o;},
+  async removeFiles(paths){if(!paths.length)return;if(DEMO){paths.forEach(p=>{if(MEM._files)delete MEM._files[p];});return;}const {error}=await sb.storage.from('cf-slips').remove(paths);if(error)throw error;},
   async saveSettings(s){if(DEMO){MEM.cf_settings=[{...s}];return {...s};}const {data,error}=await sb.from('cf_settings').upsert(s).select().single();if(error)throw error;return data;},
 };
 
 // ===================== สถานะ & คำนวณยอด =====================
 const S={tab:'home',ym:todayIso().slice(0,7),wallet:lsGet('cf_wallet','all'),email:'',settings:{warn_below:0},cats:[],txns:[],accts:[],parties:[],recur:[],budgets:[]};
 const partyById=id=>S.parties.find(p=>p.id===id);
+// ===== สลิป: ย่อรูปในเครื่องก่อนอัปโหลด (ด้านยาวสุด 1400 px · JPEG 0.75 ≈ 100–200 KB) =====
+function shrinkImage(file){return new Promise((res,rej)=>{const url=URL.createObjectURL(file);const img=new Image();
+  img.onload=()=>{const M=1400;const sc=Math.min(1,M/Math.max(img.naturalWidth,img.naturalHeight));const w=Math.round(img.naturalWidth*sc),h=Math.round(img.naturalHeight*sc);
+    const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,w,h);g.drawImage(img,0,0,w,h);URL.revokeObjectURL(url);
+    c.toBlob(b=>b?res(b):rej(new Error('ย่อรูปไม่สำเร็จ')),'image/jpeg',0.75);};
+  img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('เปิดไฟล์รูปนี้ไม่ได้ (ลองถ่ายใหม่ หรือแคปหน้าจอสลิป)'));};img.src=url;});}
+const URLC={};   // แคช signed URL ของสลิป {path:{u,exp}}
+async function slipUrls(paths){const now=Date.now();const need=paths.filter(p=>!URLC[p]||URLC[p].exp<now);
+  if(need.length){const o=await DB.signedUrls(need);need.forEach(p=>{if(o[p])URLC[p]={u:o[p],exp:now+50*60*1000};});}return paths.map(p=>URLC[p]?URLC[p].u:'');}
+function openSlipView(url){if(!url)return;const m=document.createElement('div');m.className='mask';m.style.cssText='background:rgba(0,0,0,.88);align-items:center;z-index:70';
+  m.innerHTML='<img src="'+url+'" style="max-width:96vw;max-height:88vh;border-radius:8px"><button class="hbtn" style="position:fixed;top:14px;right:14px">✕</button>';m.onclick=()=>m.remove();document.body.appendChild(m);}
 const catById=id=>S.cats.find(c=>c.id===id);
 const acctById=id=>S.accts.find(a=>a.id===id);
 const inScope=a=>!!a&&(S.wallet==='all'?(a.in_total&&a.active!==false):a.id===S.wallet);
@@ -281,7 +298,7 @@ function dailyBalances(from,to){const out={};for(let d=from;d<=to;d=addDays(d,1)
 
 // ===================== UI ทั่วไป =====================
 const $=s=>document.querySelector(s);
-function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
+function toast(msg){document.querySelectorAll('.toast').forEach(x=>x.remove());const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
 function closeModal(){$('#modal').innerHTML='';}
 function wIcon(a,sm){if(!a)return '<div class="ic'+(sm?' sm':'')+'" style="background:#0f3d2e">∑</div>';const c=WCOLORS[a.id%WCOLORS.length];return '<div class="ic'+(sm?' sm':'')+'" style="background:'+c+'">'+esc((a.name||'?').trim().replace(/^[เแโใไ]/,'').charAt(0).toUpperCase())+'</div>';}   // ข้ามสระหน้า (เงินสด → ง)
 function txIcon(t){if(t.kind==='transfer')return '<div class="ic" style="background:var(--xfer)">⇄</div>';if(t.kind==='adjust')return '<div class="ic" style="background:#475467">⚖</div>';if(t.kind==='loan')return '<div class="ic" style="background:#b54708">'+(LOAN[t.loan_type].sign>0?'🤝':'💸')+'</div>';const c=catById(t.category_id)||{grp:'exp'};return '<div class="ic" style="background:'+GRP[c.grp].color+'">'+GRP[c.grp].icon+'</div>';}
@@ -343,7 +360,7 @@ function txRow(t,withConfirm,showDate){const today=todayIso();const eff=scopeEff
   const sub=[showDate?thD(t.d):'',t.kind!=='transfer'&&S.wallet==='all'&&a?esc(a.name):'',esc(t.note)].filter(Boolean).join(' · ');
   const amt=(t.kind==='transfer'&&eff===0)?'<span style="color:var(--xfer)">'+fmt(t.amount)+'</span>':'<span class="'+(eff>=0?'pos':'neg')+'">'+(eff>=0?'+':'−')+fmt(Math.abs(eff))+'</span>';
   return '<div class="row" onclick="openTx('+t.id+')">'+txIcon(t)+'<div class="m"><div class="c">'+txTitle(t)
-    +(t.planned?(t.d<today?'<span class="tag late">เลยกำหนด</span>':'<span class="tag plan">ประมาณการ</span>'):'')+'</div>'+(sub?'<div class="n">'+sub+'</div>':'')+'</div><div class="a">'+amt+'</div>'
+    +(t.planned?(t.d<today?'<span class="tag late">เลยกำหนด</span>':'<span class="tag plan">ประมาณการ</span>'):'')+((t.attachments||[]).length?'<span class="tag" style="background:#eef4ff;color:#2f6fb0">📎'+t.attachments.length+'</span>':'')+'</div>'+(sub?'<div class="n">'+sub+'</div>':'')+'</div><div class="a">'+amt+'</div>'
     +(withConfirm&&t.planned?'<button class="btn sm" title="ยืนยันว่าจ่าย/รับจริงแล้ว" onclick="event.stopPropagation();confirmTx('+t.id+')">✓</button>':'')+'</div>';}
 async function confirmTx(id){try{await DB.update('cf_txns',id,{planned:false,updated_at:new Date().toISOString()});}catch(e){alert(e.message||e);return;}S.txns.find(x=>x.id===id).planned=false;toast('ยืนยันแล้ว');render();}
 
@@ -466,6 +483,7 @@ function openTx(id,preset,ruleId){const t=id?S.txns.find(x=>x.id===id):null;cons
          :t?{...t,kindUi:t.kind==='flow'?(catById(t.category_id)||{grp:'exp'}).grp:t.kind}
            :{freq:ruleMode?'monthly':'',end:'',kindUi:preset.kind||'exp',d:preset.d||today,account_id:preset.account_id||defAcct(),to_account_id:null,category_id:preset.category_id||null,party_id:preset.party_id||firstParty(),loan_type:preset.loan_type||'repay',amount:'',note:'',planned:false};
   if(!v.loan_type)v.loan_type='repay';if(!v.party_id)v.party_id=firstParty();
+  v.slipKeep=t?(t.attachments||[]).slice():[];v.slipNew=[];   // สลิปเดิมที่ยังเก็บไว้ · รูปใหม่ (ย่อแล้ว) รออัปโหลดตอนบันทึก
   const acctOpts=(sel,excl)=>S.accts.filter(a=>(a.active||a.id===sel)&&a.id!==excl).map(a=>'<option value="'+a.id+'"'+(a.id===sel?' selected':'')+'>'+esc(a.name)+'</option>').join('');
   const draw=()=>{const k=v.kindUi;const isFlow=!!GRP[k];const cats=isFlow?S.cats.filter(c=>c.grp===k&&(c.active||c.id===v.category_id)):[];
     if(isFlow&&!cats.some(c=>c.id===v.category_id))v.category_id=cats[0]?cats[0].id:null;
@@ -482,6 +500,7 @@ function openTx(id,preset,ruleId){const t=id?S.txns.find(x=>x.id===id):null;cons
       +'<div class="frow"><span class="cur">THB</span><div class="fx"><div class="lab">'+(k==='adjust'?(t?'ยอดปรับ (+ เพิ่ม / − ลด)':'ยอดจริงตาม statement'):'ยอดเงิน · พิมพ์ 1000+250 ได้')+'</div><input id="fAmt" class="amt" inputmode="decimal" value="'+esc(v.amount===''?'':v.amount)+'" placeholder="0"><div id="fAmtV" class="muted"></div></div></div>'
       +(isFlow?'<div class="frow"><div class="fi">'+GRP[k].icon+'</div><div class="fx"><div class="lab">หมวด</div><select id="fCat">'+cats.map(c=>'<option value="'+c.id+'"'+(c.id===v.category_id?' selected':'')+'>'+esc(c.name)+'</option>').join('')+'</select></div><span class="chev">›</span></div>':'')
       +'<div class="frow"><div class="fi">📝</div><div class="fx"><input id="fNote" value="'+esc(v.note)+'" placeholder="หมายเหตุ (เลขบิล / ชื่อร้าน / ใบแจ้งหนี้)"></div></div>'
+      +(!ruleMode&&!v.freq&&k!=='adjust'?'<div class="frow"><div class="fi">📎</div><div class="fx"><div class="lab">แนบสลิป / ใบเสร็จ</div><div id="fSlips" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px"></div></div><label class="btn sm" style="flex:none">+ รูป<input type="file" id="fFile" accept="image/*" multiple style="display:none"></label></div>':'')
       +'<div class="frow"><div class="fi">📅</div><div class="datebar"><button class="arr" id="fPrev">‹</button><div class="db"><span id="fDLab">'+thDW(v.d)+'</span><input id="fD" type="date" value="'+v.d+'"></div><button class="arr" id="fNext">›</button></div></div>'
       +'</div>';
     if(k!=='adjust'&&!t){const fo=(ruleMode?[]:[['','ไม่ทำซ้ำ']]).concat(Object.keys(FREQ).map(x=>[x,FREQ[x]]));
@@ -499,6 +518,13 @@ function openTx(id,preset,ruleId){const t=id?S.txns.find(x=>x.id===id):null;cons
         try{const [r]=await DB.insert('cf_parties',[{name:n,opening_debt:0,sort:S.parties.length,active:true}]);S.parties.push({...r,opening_debt:+r.opening_debt});keep();v.party_id=r.id;draw();}catch(e){alert(/duplicate|unique/i.test(e.message||'')?'มีชื่อนี้แล้ว':(e.message||e));}return;}showOut();};}
     $('#fAcct').onchange=()=>{keep();if(k==='transfer')draw();else showV();};
     if($('#fFreq'))$('#fFreq').onchange=()=>{keep();draw();};
+    const drawSlips=async()=>{const box=$('#fSlips');if(!box)return;const th=(src,i,isNew)=>'<div style="position:relative;width:64px;height:64px"><img data-i="'+i+'" data-n="'+(isNew?1:0)+'" src="'+(src||'')+'" style="width:64px;height:64px;object-fit:cover;border-radius:10px;background:#eef1ef;cursor:pointer"><button type="button" data-x="'+i+'" data-n="'+(isNew?1:0)+'" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:none;background:#c0262d;color:#fff;font-size:13px;line-height:1;cursor:pointer">×</button></div>';
+      let urls=[];try{urls=await slipUrls(v.slipKeep);}catch(e){}
+      box.innerHTML=v.slipKeep.map((p,i)=>th(urls[i],i,false)).join('')+v.slipNew.map((b,i)=>th(b.url,i,true)).join('')+(v.slipKeep.length+v.slipNew.length?'':'<span class="muted">ยังไม่มี — กด + รูป (ถ่ายหรือเลือกจากอัลบั้ม)</span>');
+      box.querySelectorAll('img').forEach(im=>im.onclick=()=>openSlipView(im.src));
+      box.querySelectorAll('button[data-x]').forEach(bt=>bt.onclick=()=>{const i=+bt.dataset.x;if(bt.dataset.n==='1')v.slipNew.splice(i,1);else v.slipKeep.splice(i,1);drawSlips();});};
+    drawSlips();
+    if($('#fFile'))$('#fFile').onchange=async e=>{const fs=[...e.target.files];e.target.value='';for(const f of fs){try{const b=await shrinkImage(f);v.slipNew.push({blob:b,url:URL.createObjectURL(b)});}catch(err){alert(err.message);}}drawSlips();};
     if($('#fSwap'))$('#fSwap').onclick=()=>{keep();const x=v.account_id;v.account_id=v.to_account_id;v.to_account_id=x;draw();};
     if($('#fTo'))$('#fTo').onchange=()=>keep();
     const amt=$('#fAmt'),av=$('#fAmtV');
@@ -511,7 +537,7 @@ function openTx(id,preset,ruleId){const t=id?S.txns.find(x=>x.id===id):null;cons
     if(R)$('#fDel').onclick=async()=>{if(!confirm('ลบรายการประจำนี้?\nรายการประมาณการล่วงหน้าที่ยังไม่ยืนยันจะถูกลบด้วย · รายการที่ยืนยันแล้วยังอยู่'))return;
       try{await DB.removeRecurringFuture(R.id,'0000-01-01');await DB.remove('cf_recurring',R.id);}catch(e){alert(e.message||e);return;}
       S.txns=S.txns.filter(x=>!(x.recurring_id===R.id&&x.planned));S.txns.forEach(x=>{if(x.recurring_id===R.id)x.recurring_id=null;});S.recur=S.recur.filter(x=>x.id!==R.id);closeModal();toast('ลบแล้ว');render();};
-    else if(t)$('#fDel').onclick=async()=>{if(!confirm('ลบรายการนี้?'))return;try{await DB.remove('cf_txns',t.id);}catch(e){alert(e.message||e);return;}S.txns=S.txns.filter(x=>x.id!==t.id);closeModal();toast('ลบแล้ว');render();};
+    else if(t)$('#fDel').onclick=async()=>{if(!confirm('ลบรายการนี้?'+((t.attachments||[]).length?'\n(สลิปที่แนบจะถูกลบด้วย)':'')))return;try{await DB.remove('cf_txns',t.id);if((t.attachments||[]).length)await DB.removeFiles(t.attachments).catch(()=>{});}catch(e){alert(e.message||e);return;}S.txns=S.txns.filter(x=>x.id!==t.id);closeModal();toast('ลบแล้ว');render();};
     if(!t)setTimeout(()=>amt.focus(),60);};
   const keep=()=>{if($('#fParty')&&$('#fParty').value!=='new')v.party_id=+$('#fParty').value||null;v.account_id=+$('#fAcct').value||null;if($('#fTo'))v.to_account_id=+$('#fTo').value||null;if($('#fCat'))v.category_id=+$('#fCat').value||null;v.amount=$('#fAmt').value;v.note=$('#fNote').value;v.d=$('#fD').value;if($('#fPlan'))v.planned=$('#fPlan').checked;if($('#fFreq'))v.freq=$('#fFreq').value;if($('#fEnd'))v.end=$('#fEnd').value;};
   const save=async more=>{keep();const k=v.kindUi;const n=calcExpr(v.amount);
@@ -532,9 +558,16 @@ function openTx(id,preset,ruleId){const t=id?S.txns.find(x=>x.id===id):null;cons
           await recGenerate(rr);}}
       catch(e){alert('บันทึกไม่สำเร็จ: '+(e.message||e));return;}
       lsSet('cf_last_acct',v.account_id);toast(R?'แก้รายการประจำแล้ว':'สร้างรายการประจำแล้ว');closeModal();render();return;}
-    try{if(t){row.updated_at=new Date().toISOString();const r=await DB.update('cf_txns',t.id,row);Object.assign(t,{...r,amount:+r.amount});}
-        else{const [r]=await DB.insert('cf_txns',[row]);S.txns.push({...r,amount:+r.amount});}}catch(e){alert('บันทึกไม่สำเร็จ: '+(e.message||e));return;}
-    lsSet('cf_last_acct',v.account_id);toast('บันทึกแล้ว');if(more){v.amount='';v.note='';draw();}else closeModal();render();};
+    let saved;
+    try{if(t){row.updated_at=new Date().toISOString();const r=await DB.update('cf_txns',t.id,row);Object.assign(t,{...r,amount:+r.amount});saved=t;}
+        else{const [r]=await DB.insert('cf_txns',[row]);saved={...r,amount:+r.amount};S.txns.push(saved);}}catch(e){alert('บันทึกไม่สำเร็จ: '+(e.message||e));return;}
+    // สลิป: อัปโหลดรูปใหม่ / ลบรูปที่เอาออก แล้วเก็บรายชื่อไฟล์ไว้ที่รายการ
+    const oldSlips=(t&&t.attachments)||[];const removed=oldSlips.filter(p=>!v.slipKeep.includes(p));
+    if(v.slipNew.length||removed.length){const paths=v.slipKeep.slice();
+      try{toast('⏳ กำลังอัปโหลดสลิป…');for(let i=0;i<v.slipNew.length;i++){const path=S.uid+'/'+saved.id+'/'+Date.now()+'_'+i+'.jpg';await DB.upload(path,v.slipNew[i].blob);paths.push(path);}
+        const r=await DB.update('cf_txns',saved.id,{attachments:paths});saved.attachments=r.attachments||paths;if(removed.length)await DB.removeFiles(removed).catch(()=>{});}
+      catch(e){alert('บันทึกรายการแล้ว แต่แนบสลิปไม่สำเร็จ: '+(e.message||e)+(/attachments|bucket|not found/i.test(e.message||'')?'\n(ยังไม่ได้รัน migrate_03_slips.sql ใน Fillbook?)':''));}}
+    lsSet('cf_last_acct',v.account_id);toast('บันทึกแล้ว');if(more){v.amount='';v.note='';v.slipKeep=[];v.slipNew=[];draw();}else closeModal();render();};
   draw();}
 
 // ===================== หน้า: เพิ่มเติม (แบบ More ของ Money Lover) =====================
@@ -713,7 +746,7 @@ async function start(){
   if(DEMO)seedDemo();
   else if(CF_SUPABASE_URL.includes('YOUR-')){document.body.innerHTML='<div class="login"><div class="card">ยังไม่ได้ตั้งค่า Supabase URL / anon key ในไฟล์ index.html</div></div>';return;}
   await DB.init();const sess=await DB.session();if(!sess){$('#loginView').classList.remove('hide');return;}
-  S.email=(sess.user&&sess.user.email)||'';
+  S.email=(sess.user&&sess.user.email)||'';S.uid=(sess.user&&sess.user.id)||'demo';
   $('#appView').classList.remove('hide');$('#main').innerHTML='<div class="muted">⏳ กำลังโหลด…</div>';
   try{await loadAll();}catch(e){$('#main').innerHTML='<div class="card neg">โหลดข้อมูลไม่ได้: '+esc(e.message||e)+'</div>';return;}
   render();
