@@ -594,8 +594,20 @@ function openWarn(){$('#modal').innerHTML='<div class="mask" onclick="if(event.t
 function exportAll(){const today=todayIso();downloadCsv('cashflow_backup_'+today+'.csv',txCsvRows(S.txns).concat([[],['บัญชี','ยอดตั้งต้น','ณ วันที่','รวมใน Total','ยอดวันนี้']],S.accts.map(a=>[a.name,a.opening_balance,a.opening_date,a.in_total?'ใช่':'ไม่',acctBalance(a,today,true)])));}
 
 // ===================== หน้า: กระเป๋าเงินของฉัน =====================
+// ปุ่มเปิดแอปธนาคาร (แอปบัญชีนิติบุคคล) — เดาธนาคารจากชื่อบัญชี (มีคำว่า Kbank/กสิกร หรือ SCB/ไทยพาณิชย์)
+//   Android: intent ตาม package → เปิดแอปตรงๆ (ไม่มีแอป → Play Store)
+//   iPhone: แอปไม่ได้ประกาศลิงก์เปิดแอปไว้ → พาไปหน้า App Store ของแอป (มีปุ่ม "เปิด" ถ้าติดตั้งแล้ว)
+const BANK_APPS={
+  kbank:{label:'K BIZ',color:'#138f2d',android:'com.kasikornbank.kbiz',store:'https://apps.apple.com/th/app/id6479681931'},
+  scb:{label:'SCB Anywhere',color:'#4e2a84',android:'com.scb.corporate',store:'https://apps.apple.com/th/app/id1538692124'}};
+function bankOf(a){const n=(a&&a.name||'').toLowerCase();if(/kbank|k ?biz|kasikorn|กสิกร/.test(n))return 'kbank';if(/scb|ไทยพาณิชย์/.test(n))return 'scb';return null;}
+function openBankApp(k,ev){if(ev)ev.stopPropagation();const b=BANK_APPS[k];if(!b)return;const ua=navigator.userAgent;
+  if(/android/i.test(ua)){location.href='intent://#Intent;package='+b.android+';end';return;}
+  if(/iphone|ipad|ipod/i.test(ua)||(/macintosh/i.test(ua)&&navigator.maxTouchPoints>1)){location.href=b.store;return;}
+  toast('เปิดแอป '+b.label+' ได้จากมือถือเท่านั้น');}
+function bankBtn(a){const k=bankOf(a);if(!k)return '';const b=BANK_APPS[k];return '<button class="btn sm" style="color:'+b.color+';border-color:'+b.color+';margin-right:6px;white-space:nowrap" onclick="openBankApp(\''+k+'\',event)">เปิด '+b.label+' ↗</button>';}
 function walletRow(a,picker){const b=acctBalance(a,todayIso(),true);return '<div class="row" onclick="'+(picker?'pickWallet('+a.id+')':'openWallet('+a.id+')')+'">'+wIcon(a)+'<div class="m"><div class="c" style="font-weight:600">'+esc(a.name)+'</div><div class="n '+(b<0?'neg':'')+'">฿ '+fmt(b)+'</div></div>'
-  +(picker?(S.wallet===a.id?'<b style="color:#2f6fb0;font-size:22px">✓</b>':''):'<span class="chev">›</span>')+'</div>';}
+  +bankBtn(a)+(picker?(S.wallet===a.id?'<b style="color:#2f6fb0;font-size:22px">✓</b>':''):'<span class="chev">›</span>')+'</div>';}
 function renderWallets(){const inc=S.accts.filter(a=>a.active&&a.in_total),exc=S.accts.filter(a=>a.active&&!a.in_total),hid=S.accts.filter(a=>!a.active);
   let h='<div class="sec-t">รวมใน Total</div><div class="card">'+(inc.length?inc.map(a=>walletRow(a)).join(''):'<div class="muted">ยังไม่มีบัญชี — กด + มุมขวาบน</div>')+'</div>';
   if(exc.length)h+='<div class="sec-t">ไม่รวมใน Total</div><div class="card">'+exc.map(a=>walletRow(a)).join('')+'</div>';
