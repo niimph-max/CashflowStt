@@ -596,14 +596,16 @@ function exportAll(){const today=todayIso();downloadCsv('cashflow_backup_'+today
 // ===================== หน้า: กระเป๋าเงินของฉัน =====================
 // ปุ่มเปิดแอปธนาคาร (แอปบัญชีนิติบุคคล) — เดาธนาคารจากชื่อบัญชี (มีคำว่า Kbank/กสิกร หรือ SCB/ไทยพาณิชย์)
 //   Android: intent ตาม package → เปิดแอปตรงๆ (ไม่มีแอป → Play Store)
-//   iPhone: แอปไม่ได้ประกาศลิงก์เปิดแอปไว้ → พาไปหน้า App Store ของแอป (มีปุ่ม "เปิด" ถ้าติดตั้งแล้ว)
+//   iPhone: มี ios (URL scheme ที่ทดสอบแล้ว) → เปิดแอปตรง ถ้าไม่เปิดใน 1.6 วิ → App Store · ไม่มี → ไปหน้า App Store เลย (K BIZ ไม่มี scheme)
 const BANK_APPS={
   kbank:{label:'K BIZ',color:'#138f2d',android:'com.kasikornbank.kbiz',store:'https://apps.apple.com/th/app/id6479681931'},
-  scb:{label:'SCB Anywhere',color:'#4e2a84',android:'com.scb.corporate',store:'https://apps.apple.com/th/app/id1538692124'}};
+  scb:{label:'SCB Anywhere',color:'#4e2a84',ios:'scbanywhere://',android:'com.scb.corporate',store:'https://apps.apple.com/th/app/id1538692124'}};
 function bankOf(a){const n=(a&&a.name||'').toLowerCase();if(/kbank|k ?biz|kasikorn|กสิกร/.test(n))return 'kbank';if(/scb|ไทยพาณิชย์/.test(n))return 'scb';return null;}
 function openBankApp(k,ev){if(ev)ev.stopPropagation();const b=BANK_APPS[k];if(!b)return;const ua=navigator.userAgent;
   if(/android/i.test(ua)){location.href='intent://#Intent;package='+b.android+';end';return;}
-  if(/iphone|ipad|ipod/i.test(ua)||(/macintosh/i.test(ua)&&navigator.maxTouchPoints>1)){location.href=b.store;return;}
+  if(/iphone|ipad|ipod/i.test(ua)||(/macintosh/i.test(ua)&&navigator.maxTouchPoints>1)){if(!b.ios){location.href=b.store;return;}
+    const t=setTimeout(()=>{if(!document.hidden)location.href=b.store;},1600);
+    document.addEventListener('visibilitychange',function f(){if(document.hidden){clearTimeout(t);document.removeEventListener('visibilitychange',f);}});location.href=b.ios;return;}
   toast('เปิดแอป '+b.label+' ได้จากมือถือเท่านั้น');}
 function bankBtn(a){const k=bankOf(a);if(!k)return '';const b=BANK_APPS[k];return '<button class="btn sm" style="color:'+b.color+';border-color:'+b.color+';margin-right:6px;white-space:nowrap" onclick="openBankApp(\''+k+'\',event)">เปิด '+b.label+' ↗</button>';}
 function walletRow(a,picker){const b=acctBalance(a,todayIso(),true);return '<div class="row" onclick="'+(picker?'pickWallet('+a.id+')':'openWallet('+a.id+')')+'">'+wIcon(a)+'<div class="m"><div class="c" style="font-weight:600">'+esc(a.name)+'</div><div class="n '+(b<0?'neg':'')+'">฿ '+fmt(b)+'</div></div>'
