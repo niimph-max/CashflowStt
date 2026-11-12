@@ -68,6 +68,7 @@ create table if not exists cf_txns (
   amount         numeric(16,2) not null,
   note           text not null default '',
   planned        boolean not null default false,
+  ecacc_done     boolean not null default false,   -- ติ๊กแล้วว่าลงโปรแกรมบัญชี ECACC
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now(),
   check ((kind = 'flow' and category_id is not null and to_account_id is null and party_id is null)
