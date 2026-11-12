@@ -11,6 +11,7 @@
 ## ตั้งค่าครั้งแรก
 1. Supabase (Fillbook) → SQL Editor → รัน `schema.sql` ทั้งไฟล์ แล้วรัน `migrate_03_slips.sql` (ที่เก็บสลิป)
    (ติดตั้งก่อน 08/11/2026: รัน `migrate_02_recurring_budget.sql` และ `migrate_03_slips.sql` เพิ่ม)
+   (ติดตั้งก่อน 12/11/2026: รัน `migrate_04_ecacc.sql` เพิ่ม — ช่องติ๊ก "ลง ECACC แล้ว")
 2. Authentication → Add user (อีเมล + รหัสผ่านของเจ้าของ) · ปิด sign-up สาธารณะ
 3. ใส่ Project URL + anon key ที่ `CF_SUPABASE_URL` / `CF_SUPABASE_ANON` ใน `index.html`
    (anon key เปิดเผยได้โดยออกแบบ — ตัวป้องกันคือ RLS `owner = auth.uid()` · **ห้ามใส่ service_role key**)
@@ -28,3 +29,6 @@
 
 ## สลิป
 รูปเก็บใน Storage bucket `cf-slips` (private · path = `<user id>/<รหัสรายการ>/...jpg`) · แอปย่อรูปก่อนอัปโหลด (ด้านยาว 1400 px, JPEG) · รายชื่อไฟล์อยู่ใน `cf_txns.attachments`
+
+## ECACC
+รายการจริง (ไม่ใช่ประมาณการ) มีช่องติ๊ก **ECACC** ท้ายแถวในหน้ารายการ = ลงโปรแกรมบัญชีแล้ว (`cf_txns.ecacc_done`) · ตัวกรอง "ยังไม่ลง ECACC" แสดงจำนวนที่ค้างของเดือนนั้น
